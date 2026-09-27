@@ -37,8 +37,8 @@ export const biomes: Record<string, BiomeDef> = {
       { fromSeconds: 150, spawnRate: 3.6, enemies: [['grunt', 5], ['runner', 3], ['swarmling', 3], ['lobber', 1], ['brute', 1]] },
       { fromSeconds: 270, spawnRate: 4.2, enemies: [['grunt', 4], ['runner', 3], ['swarmling', 4], ['lobber', 2], ['brute', 2], ['stalker', 1]] },
       { fromSeconds: 420, spawnRate: 4.8, enemies: [['runner', 3], ['swarmling', 5], ['lobber', 2], ['brute', 3], ['stalker', 2], ['seer', 1], ['tank', 1]] },
-      { fromSeconds: 600, spawnRate: 5.8, enemies: [['runner', 3], ['swarmling', 6], ['lobber', 2], ['brute', 3], ['stalker', 3], ['seer', 2], ['tank', 2]] },
-      { fromSeconds: 780, spawnRate: 6.8, enemies: [['runner', 3], ['swarmling', 7], ['brute', 4], ['stalker', 4], ['seer', 2], ['tank', 3]] },
+      { fromSeconds: 600, spawnRate: 5.4, enemies: [['runner', 3], ['swarmling', 6], ['lobber', 2], ['brute', 3], ['stalker', 3], ['seer', 2], ['tank', 2]] },
+      { fromSeconds: 780, spawnRate: 6.2, enemies: [['runner', 3], ['swarmling', 7], ['brute', 4], ['stalker', 4], ['seer', 2], ['tank', 2]] },
     ],
     bosses: [
       { atSeconds: 300, enemyId: 'warden' },

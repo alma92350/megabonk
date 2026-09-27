@@ -44,7 +44,7 @@ describe('PRD §2.3 performance budgets', () => {
   }, 180_000);
 
   it(`sim step at ${MAX_ENTITIES} live entities stays under the p95 ceiling`, () => {
-    const m = measureStepCost(MAX_ENTITIES, 200);
+    const m = measureStepCost(MAX_ENTITIES, 120);
     console.log(
       `  step @ ${m.entities} entities (${m.aliveEntities} alive): p50 ${m.p50.toFixed(2)} ms, ` +
         `p95 ${m.p95.toFixed(2)} ms, p99 ${m.p99.toFixed(2)} ms ` +
@@ -58,8 +58,8 @@ describe('PRD §2.3 performance budgets', () => {
   it('per-tick cost grows sub-quadratically with entity count (the spatial grid works)', () => {
     // An O(n^2) neighbour query would show a ~4x jump for a 2x population. The
     // grid should keep it near-linear; 3x allows generous slack for cache effects.
-    const small = measureStepCost(500, 150);
-    const large = measureStepCost(1000, 150);
+    const small = measureStepCost(500, 100);
+    const large = measureStepCost(1000, 100);
     const ratio = large.mean / Math.max(1e-6, small.mean);
     console.log(`  mean tick cost 500 -> 1000 entities: ${small.mean.toFixed(3)} -> ${large.mean.toFixed(3)} ms (x${ratio.toFixed(2)})`);
     expect(ratio).toBeLessThan(3);

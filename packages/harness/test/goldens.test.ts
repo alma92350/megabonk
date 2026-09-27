@@ -112,7 +112,12 @@ describe('golden runs are reproducible regardless of corpus currency', () => {
     expect(runGolden(seed, 'baseline', 2400)).toEqual(runGolden(seed, 'baseline', 2400));
   });
 
-  it(`the declared golden length (${GOLDEN_TICKS} ticks) crosses the first boss at t=300 s`, () => {
+  it(`the declared golden length (${GOLDEN_TICKS} ticks) reaches past the first boss at t=300 s`, () => {
     expect(GOLDEN_TICKS).toBeGreaterThan(300 * 60);
+    // Seeds that survive that long must actually witness the boss, or the corpus
+    // is not exercising the boss path at all.
+    const corpus = loadCorpus();
+    const longRuns = corpus.entries.filter((e) => e.seconds >= 305);
+    if (longRuns.length > 0) expect(longRuns.some((e) => e.ticks > 300 * 60)).toBe(true);
   });
 });

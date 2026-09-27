@@ -28,9 +28,12 @@ export const weapons: Record<string, WeaponDef> = {
     id: 'dart', name: 'Dartgun', kind: 'projectile', maxLevel: 5,
     description: 'One target at a time, from a long way off. The boss-killer.',
     // Single-target for its whole life, so its damage per hit has to be the
-    // highest in the game or it is never worth a slot.
+    // highest in the game or it is never worth a slot. +14/level (not +11) because
+    // at +11 the Dartgun archetype measured 679 DPS against the Bonker crit
+    // archetype's 1875 — a 2.76x spread, outside the 2.5x budget. 20 -> 76 damage
+    // across five levels puts it at ~800 and makes it genuinely the boss answer.
     damage: 20, range: 11, cooldownTicks: 26, targets: 1, knockbackTicks: 0,
-    damagePerLevel: 11, cooldownReductionPerLevel: 4, targetsPerLevel: 0,
+    damagePerLevel: 14, cooldownReductionPerLevel: 4, targetsPerLevel: 0,
   },
   halo: {
     id: 'halo', name: 'Halo', kind: 'orbital', maxLevel: 5,
@@ -38,6 +41,6 @@ export const weapons: Record<string, WeaponDef> = {
     // The fastest cadence in the roster, which makes it the weapon that cares
     // most about attack speed and area — and the one that carries a swarm run.
     damage: 6, range: 5, cooldownTicks: 16, targets: 2, knockbackTicks: 1,
-    damagePerLevel: 4, cooldownReductionPerLevel: 2, targetsPerLevel: 1,
+    damagePerLevel: 5, cooldownReductionPerLevel: 2, targetsPerLevel: 1,
   },
 };

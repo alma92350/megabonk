@@ -95,6 +95,15 @@ export interface KiteOptions {
   /** Below this threat pressure the policy prioritises pickups and chests. */
   readonly greedThreshold?: number;
   readonly priority?: readonly string[];
+  /**
+   * Walk down ranged enemies instead of only kiting the melee front. Defaults to
+   * true: a ranged enemy holds a standoff outside a melee arc, so a policy that
+   * never closes on one lets them accumulate until projectiles are most of the
+   * incoming damage. Which enemies shoot is observable — a player watches them
+   * do it — so the policy is allowed to know it. Set false to measure the game
+   * against a player who ignores them.
+   */
+  readonly huntRanged?: boolean;
 }
 
 /**

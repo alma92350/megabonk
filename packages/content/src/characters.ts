@@ -20,13 +20,14 @@ export const characters: Record<string, CharacterDef> = {
 
   sliver: {
     id: 'sliver', name: 'Sliver',
-    description: 'Glass cannon. Huge damage, 60 HP, dies to two late hits.',
-    // +45% might is the largest damage mod in the game, paid for with 40% of the
-    // health bar. At t=900 a Hulk hits for ~24, so 60 HP is three touches. The
+    description: 'Glass cannon. Huge damage, 70 HP, dies to three late hits.',
+    // +45% might is the largest damage mod in the game, paid for with 30% of the
+    // health bar. Measured at x0.6 (60 HP) Sliver's median run was 268 s against
+    // Bonker's 490 s — a trap, not a trade — so the tax is 30%, not 40%. The
     // Dartgun start is deliberate: long range is the only defence on offer.
     mods: [
       { stat: 'might', kind: 'mult', value: 1.45 },
-      { stat: 'maxHp', kind: 'mult', value: 0.6 },
+      { stat: 'maxHp', kind: 'mult', value: 0.7 },
       { stat: 'moveSpeed', kind: 'flat', value: 0.4 },
       { stat: 'critChance', kind: 'flat', value: 0.05 },
     ],

@@ -64,8 +64,12 @@ export const GOLDEN_SEEDS: readonly number[] = [
   1337, 2024, 4242, 8675309, 31337, 65535, 123456, 999983, 1000003, 2147483647,
 ];
 
-/** Long enough to cross the first boss at t=300 s, short enough for a fast suite. */
-export const GOLDEN_TICKS = 18_000;
+/**
+ * Long enough to cross the first boss at t=300 s with margin (the boss spawns on
+ * the tick t*60 is reached, so 18,000 exactly would be the boundary case), short
+ * enough that 20 seeds regenerate in well under a minute.
+ */
+export const GOLDEN_TICKS = 19_800;
 export const GOLDEN_POLICY = 'baseline';
 
 export interface GoldenEntry {

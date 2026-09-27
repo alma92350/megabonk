@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      # ARCH-1 enforcement first: it is the cheapest check and the one whose
+      # failure invalidates every result after it.
+      - run: npm run check:purity
+      - run: npm run typecheck
+      - run: npm test
+      - run: npx vite build --config packages/client/vite.config.ts

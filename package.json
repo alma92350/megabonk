@@ -3,8 +3,12 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "workspaces": ["packages/*"],
-  "engines": { "node": ">=20" },
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "npm run start:game",
     "start:game": "vite --config packages/client/vite.config.ts",
@@ -21,6 +25,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "@vitest/coverage-v8": "^2.1.9",
     "fast-check": "^3.23.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",

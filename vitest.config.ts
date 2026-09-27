@@ -15,7 +15,7 @@ export default defineConfig({
     include: ['packages/*/test/**/*.test.ts'],
     coverage: {
       provider: 'v8',
-      include: ['packages/sim/src/**', 'packages/content/src/**'],
+      include: ['packages/sim/src/**', 'packages/content/src/**', 'packages/meta/src/**'],
       thresholds: { lines: 85, branches: 80, functions: 85, statements: 85 },
     },
   },

@@ -15,11 +15,12 @@ import type { ContentBundle, MetaUnlocks, RunConfig } from '@megabonk/sim';
 import { weapons } from './weapons.js';
 import { tomes } from './tomes.js';
 import { items } from './items.js';
+import { shrines } from './shrines.js';
 import { enemies } from './enemies.js';
 import { biomes } from './biomes.js';
 import { characters } from './characters.js';
 
-export const content: ContentBundle = { weapons, tomes, items, enemies, biomes, characters };
+export const content: ContentBundle = { weapons, tomes, items, enemies, biomes, characters, shrines };
 
 export const DEFAULT_CHARACTER = 'bonker';
 export const DEFAULT_BIOME = 'verdant';
@@ -42,5 +43,5 @@ export function makeRunConfig(seed: number, opts: RunOptions = {}): RunConfig {
   };
 }
 
-export { weapons, tomes, items, enemies, biomes, characters };
+export { weapons, tomes, items, shrines, enemies, biomes, characters };
 export * from './schema.js';

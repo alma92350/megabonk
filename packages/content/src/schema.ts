@@ -79,6 +79,48 @@ export function validateContent(bundle: ContentBundle): ValidationIssue[] {
     checkNumber(issues, where, 'speed', e.speed, { min: 0 });
     checkNumber(issues, where, 'radius', e.radius, { min: 0.05 });
     checkNumber(issues, where, 'xp', e.xp, { min: 0 });
+
+    // Ranged enemies: a standoff outside every weapon's reach makes an enemy the
+    // player literally cannot answer, and a projectile slower than the player is
+    // decorative. Both are silent design bugs, so they are checked here.
+    if (e.ranged) {
+      checkNumber(issues, where, 'ranged.range', e.ranged.range, { min: 1 });
+      checkNumber(issues, where, 'ranged.cooldownTicks', e.ranged.cooldownTicks, { min: 1 });
+      checkNumber(issues, where, 'ranged.projectileSpeed', e.ranged.projectileSpeed, { min: 1 });
+      checkNumber(issues, where, 'ranged.standoff', e.ranged.standoff, { min: 0.5 });
+      if (e.ranged.standoff > e.ranged.range) {
+        issues.push({
+          where,
+          problem: `ranged.standoff ${e.ranged.standoff} exceeds ranged.range ${e.ranged.range}, so it holds a distance it cannot shoot from`,
+        });
+      }
+      const reach = Math.max(...Object.values(bundle.weapons).map((w) => w.range), 0);
+      if (e.ranged.standoff > reach) {
+        issues.push({
+          where,
+          problem: `ranged.standoff ${e.ranged.standoff} is beyond every weapon's base range (max ${reach}); nothing could ever kill it`,
+        });
+      }
+    }
+  }
+
+  for (const [id, sh] of Object.entries(bundle.shrines ?? {})) {
+    const where = `shrine:${id}`;
+    if (sh.id !== id) issues.push({ where, problem: `id field "${sh.id}" does not match key` });
+    checkNumber(issues, where, 'cost', sh.cost, { min: 1 });
+    checkNumber(issues, where, 'durationSeconds', sh.durationSeconds, { min: 1 });
+    if (sh.mods.length === 0) issues.push({ where, problem: 'has no modifiers' });
+    for (const m of sh.mods) {
+      checkNumber(issues, where, `mod ${m.stat}`, m.value);
+      if (m.kind === 'mult' && m.value <= 0) {
+        issues.push({ where, problem: `multiplicative mod on ${m.stat} must be > 0` });
+      }
+      // A shrine cannot grant a condition tag, so a `requires` on one can only be
+      // satisfied by an item the player may not hold — a coin-flip modifier.
+      if (m.requires !== undefined && !grants.has(m.requires)) {
+        issues.push({ where, problem: `requires "${m.requires}" which no item grants` });
+      }
+    }
   }
 
   for (const [id, b] of Object.entries(bundle.biomes)) {
@@ -124,6 +166,16 @@ export function validateContent(bundle: ContentBundle): ValidationIssue[] {
       if (at > b.durationSeconds) {
         issues.push({ where, problem: `merchant at ${at}s never arrives` });
       }
+    }
+    checkNumber(issues, where, 'chestCount', b.chestCount ?? 0, { min: 0, max: 64 });
+    checkNumber(issues, where, 'shrineCount', b.shrineCount ?? 0, { min: 0, max: 64 });
+    // The sim places nothing when the shrine table is empty, silently. A biome
+    // that asks for shrines and gets none is the exact failure this catches.
+    if ((b.shrineCount ?? 0) > 0 && Object.keys(bundle.shrines ?? {}).length === 0) {
+      issues.push({
+        where,
+        problem: `shrineCount ${b.shrineCount} but the bundle defines no shrines; the sim would place none and say nothing`,
+      });
     }
   }
 

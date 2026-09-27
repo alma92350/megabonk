@@ -1,5 +1,0 @@
-{
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "outDir": "dist", "rootDir": "src", "paths": { "@megabonk/sim": ["../sim/src/index.ts"] }, "baseUrl": "." },
-  "include": ["src/**/*"]
-}

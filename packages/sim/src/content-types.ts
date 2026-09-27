@@ -71,6 +71,15 @@ export interface ShrineDef {
   readonly stackable?: boolean;
 }
 
+/** Present only on ranged enemies. Absent means the enemy closes to melee. */
+export interface RangedAttack {
+  readonly range: number;
+  readonly cooldownTicks: number;
+  readonly projectileSpeed: number;
+  /** Distance the enemy tries to hold. Below this it backs away. */
+  readonly standoff: number;
+}
+
 export interface EnemyDef {
   readonly id: string;
   readonly name: string;
@@ -81,6 +90,7 @@ export interface EnemyDef {
   readonly xp: number;
   readonly gold: number;
   readonly isBoss?: boolean;
+  readonly ranged?: RangedAttack;
 }
 
 export interface WavePhase {

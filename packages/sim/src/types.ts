@@ -32,6 +32,22 @@ export interface Enemy {
   readonly dyingFor?: number;
 }
 
+/**
+ * An enemy projectile. Deliberately dodgeable: instant-hit ranged attacks would
+ * punish standing still without rewarding movement, which is the opposite of what
+ * this genre needs.
+ */
+export interface Projectile {
+  readonly id: EntityId;
+  readonly pos: Vec2;
+  /** World units per second. */
+  readonly vel: Vec2;
+  readonly damage: number;
+  readonly radius: number;
+  /** Ticks remaining before it despawns. */
+  readonly ttl: number;
+}
+
 export type PickupKind = 'xp' | 'gold' | 'heal';
 
 export interface Pickup {
@@ -151,6 +167,7 @@ export interface GameState {
   readonly player: PlayerState;
   readonly enemies: readonly Enemy[];
   readonly pickups: readonly Pickup[];
+  readonly projectiles: readonly Projectile[];
   readonly interactables: readonly Interactable[];
   readonly map: MapState;
   readonly offer: Offer | null;

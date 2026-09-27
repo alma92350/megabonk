@@ -14,7 +14,7 @@
 
 import { nextFloat, nextInt, nextRange, weightedPick, type RngState } from './rng.js';
 import { grantXp } from './progression.js';
-import { applyMovement, distance, normalise, selectTargetIndex } from './combat.js';
+import { applyMovement, distance, hasLineOfSight, normalise, selectTargetIndex } from './combat.js';
 import { resolveStats, BASE_STATS } from './stats.js';
 import { activeConditions, collectModifiers } from './build.js';
 import { buildOffer } from './offers.js';
@@ -40,6 +40,7 @@ import type {
   OfferOption,
   Pickup,
   PlayerState,
+  Projectile,
   SimEvent,
   Vec2,
 } from './types.js';
@@ -56,6 +57,7 @@ interface Mut {
   events: SimEvent[];
   enemies: Enemy[];
   pickups: Pickup[];
+  projectiles: Projectile[];
   interactables: Interactable[];
   nextId: number;
   kills: number;
@@ -158,7 +160,12 @@ function runSpawns(m: Mut, state: GameState, config: RunConfig, seconds: number)
   }
 }
 
-function moveEnemies(m: Mut, state: GameState, dtSeconds: number): void {
+function moveEnemies(
+  m: Mut,
+  state: GameState,
+  dtSeconds: number,
+  content: ContentBundle,
+): void {
   const target = state.player.pos;
   const grid = SpatialGrid.build(m.enemies, SEPARATION_CELL);
 
@@ -170,7 +177,36 @@ function moveEnemies(m: Mut, state: GameState, dtSeconds: number): void {
       continue;
     }
 
-    const toward = normalise({ x: target.x - e.pos.x, y: target.y - e.pos.y });
+    const def = content.enemies[e.kind];
+    const ranged = def?.ranged;
+    const distToPlayer = distance(e.pos, target);
+
+    // Ranged enemies hold a standoff distance and shoot, so a stationary player
+    // is never safe. They still respect line of sight (FR-8 / AC-8.1).
+    if (ranged) {
+      const canSee = hasLineOfSight(e.pos, target, state.map);
+      if (distToPlayer <= ranged.range && canSee && e.attackCooldown <= 0) {
+        const dir = normalise({ x: target.x - e.pos.x, y: target.y - e.pos.y });
+        m.projectiles.push({
+          id: m.nextId++,
+          pos: { ...e.pos },
+          vel: { x: dir.x * ranged.projectileSpeed, y: dir.y * ranged.projectileSpeed },
+          damage: e.damage,
+          radius: 0.25,
+          ttl: Math.round((ranged.range / ranged.projectileSpeed) * TICKS_PER_SECOND) + 30,
+        });
+        emit(m, state.tick + 1, 'enemy_fired', { kind: e.kind });
+        m.enemies[i] = { ...e, attackCooldown: ranged.cooldownTicks };
+        continue;
+      }
+    }
+
+    let toward = normalise({ x: target.x - e.pos.x, y: target.y - e.pos.y });
+    if (ranged) {
+      // Too close: back off. In the standoff band: hold. Too far: approach.
+      if (distToPlayer < ranged.standoff * 0.8) toward = { x: -toward.x, y: -toward.y };
+      else if (distToPlayer <= ranged.standoff) toward = { x: 0, y: 0 };
+    }
 
     // Separation: push apart from crowded neighbours so swarms form a ring
     // rather than a single stacked point. Grid-limited, so it stays O(n·k).
@@ -346,6 +382,55 @@ function collectPickups(m: Mut, state: GameState, player: PlayerState): PickupRe
   }
 
   return { player: next, levelsGained };
+}
+
+/**
+ * Advance enemy projectiles. A projectile is removed when it hits the player, hits
+ * a tall obstacle, leaves the map, or times out — so the list cannot grow forever.
+ */
+function advanceProjectiles(
+  m: Mut,
+  state: GameState,
+  player: PlayerState,
+  dtSeconds: number,
+): { player: PlayerState } {
+  if (m.projectiles.length === 0) return { player };
+  const half = state.map.halfExtent;
+  const live: Projectile[] = [];
+  let next = player;
+
+  for (const p of m.projectiles) {
+    if (p.ttl <= 0) continue;
+    const pos: Vec2 = { x: p.pos.x + p.vel.x * dtSeconds, y: p.pos.y + p.vel.y * dtSeconds };
+    if (Math.abs(pos.x) > half || Math.abs(pos.y) > half) continue;
+
+    // Tall obstacles stop shots, matching the line-of-sight rule that let the
+    // enemy fire in the first place; a shot that phased through cover would make
+    // FR-8 cosmetic.
+    let blocked = false;
+    for (const o of state.map.obstacles) {
+      if (o.height < 2) continue;
+      if (distance(pos, o.pos) < o.radius + p.radius) {
+        blocked = true;
+        break;
+      }
+    }
+    if (blocked) continue;
+
+    if (distance(pos, next.pos) <= p.radius + PLAYER_RADIUS) {
+      if (next.invulnerable <= 0) {
+        const taken = Math.max(1, p.damage - next.stats.armour);
+        m.damageTaken += taken;
+        emit(m, state.tick + 1, 'damage_taken', { amount: taken, source: 'projectile' });
+        next = { ...next, hp: next.hp - taken, invulnerable: INVULNERABLE_TICKS };
+      }
+      continue;
+    }
+
+    live.push({ ...p, pos, ttl: p.ttl - 1 });
+  }
+  m.projectiles = live;
+  return { player: next };
 }
 
 function applyEnemyContact(m: Mut, state: GameState, player: PlayerState): PlayerState {
@@ -579,6 +664,7 @@ export function step(
     events: [],
     enemies: state.enemies.slice(),
     pickups: state.pickups.slice(),
+    projectiles: state.projectiles.slice(),
     interactables: state.interactables.slice(),
     nextId: state.nextId,
     kills: state.kills,
@@ -660,7 +746,7 @@ export function step(
     pos: applyMovement(player.pos, moveDir, player.stats.moveSpeed, dtSeconds, state.map, PLAYER_RADIUS),
     facing,
   };
-  moveEnemies(m, { ...state, player }, dtSeconds);
+  moveEnemies(m, { ...state, player }, dtSeconds, config.content);
 
   // 2. Spawning.
   runSpawns(m, { ...state, player }, config, seconds);
@@ -675,8 +761,9 @@ export function step(
   const collected = collectPickups(m, { ...state, player }, player);
   player = collected.player;
 
-  // 6. Enemy contact damage.
+  // 6. Enemy contact damage, then projectiles.
   player = applyEnemyContact(m, { ...state, player }, player);
+  player = advanceProjectiles(m, { ...state, player }, player, dtSeconds).player;
 
   // 7. Interactables (chests, shrines) and buff expiry.
   const interacted = runInteractables(m, { ...state, player }, config, player);
@@ -713,8 +800,8 @@ export function step(
     emit(m, tick, 'run_end', { outcome: 'died', seconds });
     return {
       ...state, tick, phase: 'ended', outcome: 'died', player: { ...player, hp: 0 },
-      enemies: m.enemies, pickups: m.pickups, interactables: m.interactables,
-      merchant: purchasedMerchant, rng: m.rng,
+      enemies: m.enemies, pickups: m.pickups, projectiles: m.projectiles,
+      interactables: m.interactables, merchant: purchasedMerchant, rng: m.rng,
       nextId: m.nextId, kills: m.kills, bossKills: m.bossKills,
       damageDealt: m.damageDealt, damageTaken: m.damageTaken, goldEarned: m.goldEarned,
       events: m.events, offer: null, queuedOffers: 0, queuedChestOffers: 0,
@@ -724,8 +811,8 @@ export function step(
     emit(m, tick, 'run_end', { outcome: 'survived', seconds });
     return {
       ...state, tick, phase: 'ended', outcome: 'survived', player,
-      enemies: m.enemies, pickups: m.pickups, interactables: m.interactables,
-      merchant: purchasedMerchant, rng: m.rng,
+      enemies: m.enemies, pickups: m.pickups, projectiles: m.projectiles,
+      interactables: m.interactables, merchant: purchasedMerchant, rng: m.rng,
       nextId: m.nextId, kills: m.kills, bossKills: m.bossKills,
       damageDealt: m.damageDealt, damageTaken: m.damageTaken, goldEarned: m.goldEarned,
       events: m.events, offer: null, queuedOffers: 0, queuedChestOffers: 0,
@@ -755,6 +842,7 @@ export function step(
     player,
     enemies: m.enemies,
     pickups: m.pickups,
+    projectiles: m.projectiles,
     interactables: m.interactables,
     merchant: purchasedMerchant,
     rng: m.rng,

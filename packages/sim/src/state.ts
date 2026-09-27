@@ -173,6 +173,7 @@ export function createRun(config: RunConfig): GameState {
     },
     enemies: [],
     pickups: [],
+    projectiles: [],
     interactables: placed.interactables,
     map: { halfExtent: biome.halfExtent, obstacles },
     offer: null,

@@ -230,10 +230,20 @@ A run ends on player death or at t = 900s. Both produce a `RunSummary`.
 - AC-7.2 Movement into an impassable tile slides along the obstacle rather than stopping dead.
 - AC-7.3 The player cannot leave the map bounds.
 
-**FR-8 Elevation (data only, v1).** Tiles carry a `height` value. Height blocks line-of-sight for ranged enemies and applies a movement-cost multiplier. No jumping, climbing, or traversal abilities in v1.
+**FR-8 Elevation (data only, v1).** Obstacles carry a `height` value. Height blocks
+line-of-sight for ranged enemies. No jumping, climbing, or traversal abilities in v1.
 
-- AC-8.1 A ranged enemy with a height-2 tile on the segment to the player does not fire.
-- AC-8.2 Moving onto a tile one step higher costs 1.5× the movement time.
+- AC-8.1 A ranged enemy with a height-2 obstacle on the segment to the player does not fire. **Implemented and tested.** A projectile already in flight is also stopped by the same obstacle — a shot that phased through cover would make this requirement cosmetic.
+- AC-8.2 ~~Moving onto a tile one step higher costs 1.5× the movement time.~~ **Deferred.** This AC assumed a tile grid with per-tile heights. The map is actually a set of circular obstacles carrying heights, which supports line-of-sight (AC-8.1) but has no notion of "a tile one step higher" to move onto. Implementing it would mean adding a height field to the map purely to satisfy one AC, in a system open question #4 already flags as a candidate for removal. Revisit alongside that decision rather than building a grid nothing else uses.
+
+**FR-8a Ranged enemies.** Some enemies hold a standoff distance and fire dodgeable
+projectiles rather than closing to melee.
+
+- AC-8a.1 A ranged enemy fires only when the player is within its range AND line of sight is clear; it respects a cooldown rather than firing every tick.
+- AC-8a.2 A ranged enemy backs away below 80% of its standoff distance, holds inside the standoff band, and approaches beyond it.
+- AC-8a.3 Projectiles travel at a finite speed and are dodgeable; they are removed on hitting the player, hitting a tall obstacle, leaving the map, or timing out, so the list cannot grow without bound.
+- AC-8a.4 A melee enemy never fires.
+- AC-8a.5 **Standing still in the presence of ranged enemies takes damage.** This is the mechanical guarantee that positioning matters; a stationary player being safe is a core game-feel failure in this genre, and it is asserted as a test rather than left to balance.
 
 ### 6.3 Build systems
 
@@ -572,6 +582,7 @@ Build questions, not publisher questions.
 | §6.3 FR-9 explicit stat composition order | The hardest correctness problem in the genre, previously unaddressed |
 | §6.7 the entire MCP section | A stated constraint with zero prior coverage |
 | FR-25 agent latency and tick model | The unasked question that determines whether the feature is usable |
+| FR-8a ranged enemies with dodgeable projectiles | Gives FR-8's line-of-sight rule something to govern, and makes standing still unsafe — asserted as a test, since a stationary player being safe is a core game-feel failure |
 | §6.8 FR-27..FR-30 agent parity handicap | Degrades the agent to human-comparable perception and actuation, in ticks so determinism survives; includes the measured-parity tests that prove the handicap actually binds |
 | §8 local event log replacing telemetry | One mechanism serving agent, tests, summary, and balance |
 | §9 test strategy | TDD was asserted but never planned |

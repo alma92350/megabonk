@@ -26,9 +26,14 @@ export function enemyAt(id: number, pos: Vec2, over: Partial<Enemy> = {}): Enemy
 }
 
 /** A state at a chosen tick with a handmade enemy roster — used for the perception unit tests. */
-export function stateWith(tick: number, enemies: readonly Enemy[], config = cfg()): GameState {
+export function stateWith(
+  tick: number,
+  enemies: readonly Enemy[],
+  config = cfg(),
+  extra: Partial<GameState> = {},
+): GameState {
   const base = createRun(config);
-  return { ...base, tick, enemies };
+  return { ...base, tick, enemies, ...extra };
 }
 
 const still: InputFrame = { move: { x: 0, y: 0 } };

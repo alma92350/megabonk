@@ -14,11 +14,15 @@ import type { WeaponDef } from '@megabonk/sim';
 export const weapons: Record<string, WeaponDef> = {
   bonker: {
     id: 'bonker', name: 'The Bonker', kind: 'melee', maxLevel: 5,
-    description: 'A short, heavy swing. Two targets now, six when mastered.',
-    // range 2.4 against a 0.9-unit contact distance leaves a 1.5-unit moat that a
-    // 2.3 u/s grunt crosses in 0.65 s — less than one swing cycle, so grunts land.
-    damage: 10, range: 2.4, cooldownTicks: 30, targets: 2, knockbackTicks: 4,
-    damagePerLevel: 7, cooldownReductionPerLevel: 3, targetsPerLevel: 1,
+    description: 'A wide, heavy swing. Three targets now, seven when mastered.',
+    // range 3.0 against a 0.9-unit contact distance. Wide enough that a moving
+    // player is not swarmed from behind (at 2.4 the reference kiting policy died
+    // at 149 s median — the arc could not hold a front), and 12 damage against a
+    // 16 HP grunt means two hits per kill, so the arc's clear rate never runs far
+    // ahead of the spawn rate. Standing still is punished by ranged enemies, not
+    // by a knife-edge melee throughput — see enemies.ts `lobber`.
+    damage: 12, range: 3, cooldownTicks: 28, targets: 3, knockbackTicks: 5,
+    damagePerLevel: 8, cooldownReductionPerLevel: 3, targetsPerLevel: 1,
   },
   dart: {
     id: 'dart', name: 'Dartgun', kind: 'projectile', maxLevel: 5,

@@ -201,15 +201,15 @@ export class McpSession {
     this.pendingChoose = null;
     this.pendingReroll = null;
     this.pendingBuy = null;
-    if (this.mode === 'autonomous') {
-      engine.annotations = { handicap: this.handicap.profile };
-      if (this.handicap.profile === 'unrestricted') {
-        // AC-29.3: an unhandicapped run must announce itself.
-        this.warn(
-          'WARNING: agent handicap profile "unrestricted" — perception and actuation filters are OFF. ' +
-            'Results are not comparable with human-parity runs.',
-        );
-      }
+    // AC-29.3: the profile is disclosed in the log and on stderr whatever the mode.
+    // An *advisor* running unrestricted is the wallhack AC-29.5 exists to prevent,
+    // so it warns too, even though its summary records agentProfile: null.
+    engine.annotations = { handicap: this.handicap.profile, agentMode: this.mode };
+    if (this.handicap.profile === 'unrestricted') {
+      this.warn(
+        'WARNING: agent handicap profile "unrestricted" — perception and actuation filters are OFF. ' +
+          'Results are not comparable with human-parity runs.',
+      );
     }
     engine.subscribe((e) => this.gate?.record(e.state, e.offerTicks));
     this.gate.record(engine.state, engine.offerTicks);
@@ -323,8 +323,8 @@ export class McpSession {
   getBuild(): BuildReport {
     const obs = this.observation();
     const bundle = this.engine.config.content ?? content;
-    const tomes: BuildReport['tomes'] = [];
-    const items: BuildReport['items'] = [];
+    const tomes: { id: string; name: string; stacks: number }[] = [];
+    const items: { id: string; name: string; rarity: string; stacks: number }[] = [];
     for (const held of obs.player.items) {
       const tome = bundle.tomes[held.id];
       if (tome) tomes.push({ id: held.id, name: tome.name, stacks: held.stacks });

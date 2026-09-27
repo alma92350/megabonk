@@ -1,0 +1,82 @@
+{
+  "formatVersion": 1,
+  "generatedAt": "2026-09-27T15:38:20.113Z",
+  "node": "v22.22.2",
+  "steps": [
+    {
+      "p50": 0.0904049999990093,
+      "p95": 0.12669200000163983,
+      "p99": 0.4432489999999234,
+      "mean": 0.09958685749989854,
+      "samples": 400,
+      "entities": 100,
+      "observedEntities": 100,
+      "aliveEntities": 100,
+      "variant": "immortal"
+    },
+    {
+      "p50": 0.836103000001458,
+      "p95": 1.09779300000082,
+      "p99": 1.5806049999955576,
+      "mean": 0.8665490575000331,
+      "samples": 400,
+      "entities": 500,
+      "observedEntities": 500,
+      "aliveEntities": 500,
+      "variant": "immortal"
+    },
+    {
+      "p50": 2.182064000007813,
+      "p95": 2.8186580000037793,
+      "p99": 3.222391000002972,
+      "mean": 2.2526257425002405,
+      "samples": 400,
+      "entities": 1000,
+      "observedEntities": 1000,
+      "aliveEntities": 1000,
+      "variant": "immortal"
+    },
+    {
+      "p50": 5.740653000000748,
+      "p95": 8.803954000002705,
+      "p99": 11.652341000008164,
+      "mean": 6.029749005000449,
+      "samples": 400,
+      "entities": 2000,
+      "observedEntities": 2000,
+      "aliveEntities": 2000,
+      "variant": "immortal"
+    },
+    {
+      "p50": 5.810946999990847,
+      "p95": 8.28918700000213,
+      "p99": 9.91171800000302,
+      "mean": 5.959121119999545,
+      "samples": 400,
+      "entities": 2000,
+      "observedEntities": 2000,
+      "aliveEntities": 2000,
+      "variant": "natural"
+    }
+  ],
+  "fullRun": {
+    "seeds": [
+      1,
+      2,
+      3
+    ],
+    "ticks": 54000,
+    "perSeedMs": [
+      1415.2,
+      804.3,
+      1797.5
+    ],
+    "p50Ms": 1415.2,
+    "maxMs": 1797.5,
+    "finalEnemies": [
+      40,
+      14,
+      77
+    ]
+  }
+}

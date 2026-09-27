@@ -27,13 +27,13 @@ export const tomes: Record<string, TomeDef> = {
     maxStacks: 5, mods: [{ stat: 'critChance', kind: 'flat', value: 0.06 }],
   },
   hide: {
-    id: 'hide', name: 'Tome of Hide', description: '+2 armour and +10% max HP per stack.',
+    id: 'hide', name: 'Tome of Hide', description: '+2 armour and +12% max HP per stack.',
     // Armour is FLAT reduction with a 1-damage floor, so 10 armour removes most
     // of a Grunt hit and only a third of a Hulk hit. It buys time, never immunity.
     maxStacks: 5,
     mods: [
       { stat: 'armour', kind: 'flat', value: 2 },
-      { stat: 'maxHp', kind: 'mult', value: 1.1 },
+      { stat: 'maxHp', kind: 'mult', value: 1.12 },
     ],
   },
   fortune: {

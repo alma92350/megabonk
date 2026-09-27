@@ -27,7 +27,7 @@ import type { GameState, RunConfig } from '@megabonk/sim';
 import { makeRunConfig } from '@megabonk/content';
 import { drive, FULL_RUN_TICKS } from './drive.js';
 import { stationaryPolicy, baselinePolicy } from './policy.js';
-import { benchSwarmConfig, frozenConfig, survivableConfig } from './scenarios.js';
+import { benchSwarmConfig, frozenConfig, survivableConfig, swarmConfig } from './scenarios.js';
 import { argWarnings, boolArg, intArg, parseArgs } from './args.js';
 
 export const BASELINE_PATH = fileURLToPath(new URL('../bench-baseline.json', import.meta.url));
@@ -87,6 +87,16 @@ export interface StepMeasurement extends Quantiles {
   readonly entities: number;
   /** Live enemies actually present on the last measured tick, as a sanity check. */
   readonly observedEntities: number;
+  /**
+   * `immortal`: every one of `entities` enemies is ALIVE and fully simulated.
+   * `natural`:  a live swarm at the cap, where a share of the array is corpses
+   *             fading out (`hp <= 0`), which several systems skip. This is the
+   *             cheaper and more realistic shape, and the two numbers differing
+   *             by ~2x is why the variant is recorded rather than assumed.
+   */
+  readonly variant: 'immortal' | 'natural';
+  /** Enemies with hp > 0 on the last measured tick. */
+  readonly aliveEntities: number;
 }
 
 export function measureStepCost(count: number, samples = 400, warmup = 60): StepMeasurement {
@@ -103,7 +113,45 @@ export function measureStepCost(count: number, samples = 400, warmup = 60): Step
     state = step(state, frame, TICK_MS, config);
     times.push(performance.now() - t0);
   }
-  return { ...quantiles(times), entities: count, observedEntities: state.enemies.length };
+  return {
+    ...quantiles(times),
+    entities: count,
+    observedEntities: state.enemies.length,
+    aliveEntities: state.enemies.filter((e) => e.hp > 0).length,
+    variant: 'immortal',
+  };
+}
+
+/**
+ * The same cap measured on a NATURAL swarm: enemies are mortal, so weapons kill
+ * them, corpses linger a few ticks for the renderer, and spawning refills the
+ * ring. `enemies.length` sits at the cap but only a share of it is alive, and the
+ * systems that skip `hp <= 0` therefore do less work. Reported alongside the
+ * immortal number so a quoted "p95 at 2000 entities" is never ambiguous about
+ * which of the two it means.
+ */
+export function measureNaturalSwarmCost(samples = 400, warmup = 60): StepMeasurement {
+  const config = swarmConfig(makeRunConfig(7));
+  const filled = drive(config, { ticks: 700, policy: stationaryPolicy, collectEvents: false });
+  let state = filled.state;
+  const input = { move: { x: 0.6, y: 0.8 } };
+  for (let i = 0; i < warmup; i++) {
+    state = step(state, state.phase === 'offer' ? { ...input, chooseIndex: 0 } : input, TICK_MS, config);
+  }
+  const times: number[] = [];
+  for (let i = 0; i < samples; i++) {
+    const frame = state.phase === 'offer' ? { ...input, chooseIndex: 0 } : input;
+    const t0 = performance.now();
+    state = step(state, frame, TICK_MS, config);
+    times.push(performance.now() - t0);
+  }
+  return {
+    ...quantiles(times),
+    entities: MAX_ENTITIES,
+    observedEntities: state.enemies.length,
+    aliveEntities: state.enemies.filter((e) => e.hp > 0).length,
+    variant: 'natural',
+  };
 }
 
 export interface FullRunMeasurement {
@@ -157,7 +205,7 @@ export function runBenchmarks(samples: number, fullRunSeeds: readonly number[]):
     formatVersion: 1,
     generatedAt: new Date().toISOString(),
     node: process.version,
-    steps: ENTITY_COUNTS.map((n) => measureStepCost(n, samples)),
+    steps: [...ENTITY_COUNTS.map((n) => measureStepCost(n, samples)), measureNaturalSwarmCost(samples)],
     fullRun: measureFullRun(fullRunSeeds),
   };
 }
@@ -197,8 +245,8 @@ export function compareToBaseline(report: BenchReport, baseline: BenchReport | n
   };
 
   for (const s of report.steps) {
-    const base = baseline?.steps.find((b) => b.entities === s.entities);
-    add(`step p95 @ ${s.entities} entities (ms)`, s.p95, base?.p95);
+    const base = baseline?.steps.find((b) => b.entities === s.entities && b.variant === s.variant);
+    add(`step p95 @ ${s.entities} ${s.variant} entities (ms)`, s.p95, base?.p95);
   }
   add('full run p50 (ms)', report.fullRun.p50Ms, baseline?.fullRun.p50Ms);
   return out;
@@ -212,11 +260,12 @@ export interface PrdCheck {
 }
 
 export function checkPrdTargets(report: BenchReport): PrdCheck[] {
-  const cap = report.steps.find((s) => s.entities === MAX_ENTITIES);
   const checks: PrdCheck[] = [];
-  if (cap) {
+  for (const variant of ['immortal', 'natural'] as const) {
+    const cap = report.steps.find((s) => s.entities === MAX_ENTITIES && s.variant === variant);
+    if (!cap) continue;
     checks.push({
-      metric: `sim step p95 @ ${MAX_ENTITIES} entities`,
+      metric: `sim step p95 @ ${MAX_ENTITIES} entities (${variant}, ${cap.aliveEntities} alive)`,
       measured: round(cap.p95),
       target: PRD_STEP_P95_MS,
       withinTarget: cap.p95 < PRD_STEP_P95_MS,
@@ -276,12 +325,12 @@ export function runBenchCli(argv: readonly string[], log: (s: string) => void = 
   }
 
   log('');
-  log('  entities    p50      p95      p99     mean    (ms/tick)');
+  log('  entities  variant     alive     p50      p95      p99     mean    (ms/tick)');
   for (const s of report.steps) {
     log(
-      `  ${String(s.entities).padStart(8)}  ${s.p50.toFixed(3).padStart(6)}  ${s.p95
-        .toFixed(3)
-        .padStart(6)}  ${s.p99.toFixed(3).padStart(6)}  ${s.mean.toFixed(3).padStart(6)}`,
+      `  ${String(s.entities).padStart(8)}  ${s.variant.padEnd(9)}  ${String(s.aliveEntities).padStart(5)}  ` +
+        `${s.p50.toFixed(3).padStart(6)}  ${s.p95.toFixed(3).padStart(6)}  ` +
+        `${s.p99.toFixed(3).padStart(6)}  ${s.mean.toFixed(3).padStart(6)}`,
     );
   }
   log('');

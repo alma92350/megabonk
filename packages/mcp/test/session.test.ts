@@ -150,6 +150,22 @@ describe('FR-24/FR-28 write-tool guards', () => {
   });
 });
 
+describe('FR-22 lifecycle', () => {
+  it('AC-22.2: losing the agent does not crash or stall the live game', () => {
+    const engine = new RunEngine(makeRunConfig(5));
+    let live: ReturnType<typeof createSession> | null = createSession({
+      mode: 'autonomous',
+      engine,
+    });
+    for (let i = 0; i < 60; i++) engine.tickOnce(live.nextInput());
+    const atHandover = engine.state.tick;
+    live = null; // the MCP server process is gone
+    for (let i = 0; i < 300; i++) engine.tickOnce({ move: { x: 1, y: 0 } });
+    expect(engine.state.tick).toBe(atHandover + 300);
+    expect(engine.state.phase).not.toBe('ended');
+  });
+});
+
 describe('FR-23 attachment model', () => {
   it('AC-23.1: the same tool-call sequence headless and attached reaches the same terminal state', () => {
     const seed = 31337;
@@ -203,5 +219,18 @@ describe('FR-29 disclosure', () => {
     expect(runStart?.data?.['handicap']).toBe('unrestricted');
     expect(warnings.join(' ')).toMatch(/unrestricted/i);
     expect(s.getRunSummary().agentProfile).toBe('unrestricted');
+  });
+
+  it('AC-29.3: an unrestricted ADVISOR warns too — it is a wallhack with extra steps', () => {
+    const warnings: string[] = [];
+    const s = createSession({
+      seed: 5,
+      mode: 'advisor',
+      handicap: resolveHandicap({ profile: 'unrestricted' }),
+      warn: (m) => warnings.push(m),
+    });
+    s.startRun();
+    expect(warnings.join(' ')).toMatch(/unrestricted/i);
+    expect(s.getRunSummary().agentProfile).toBeNull();
   });
 });

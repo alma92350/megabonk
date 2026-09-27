@@ -10,11 +10,11 @@ import type { CharacterDef } from '@megabonk/sim';
 export const characters: Record<string, CharacterDef> = {
   bonker: {
     id: 'bonker', name: 'Bonker',
-    description: 'Balanced. 120 HP, a big stick, and no excuses.',
+    description: 'Balanced. 145 HP, a big stick, and no excuses.',
     // The reference character every balance target in DESIGN.md is measured on.
     // +20 HP (not a multiplier) because the forgiveness is wanted in minute one,
     // where a flat bonus is proportionally largest.
-    mods: [{ stat: 'maxHp', kind: 'flat', value: 20 }],
+    mods: [{ stat: 'maxHp', kind: 'flat', value: 45 }],
     startingWeapon: 'bonker',
   },
 

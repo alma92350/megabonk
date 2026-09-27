@@ -45,9 +45,13 @@ describe('FR-22 MCP lifecycle over a real transport', () => {
     const text = (state.content as { text: string }[])[0]!.text;
     expect(JSON.parse(text).tick).toBeGreaterThan(0);
 
-    await expect(
-      client.callTool({ name: 'set_intent', arguments: { kind: 'vector', x: 'north' } }),
-    ).rejects.toThrow();
+    // AC-24.1: a schema violation comes back as a structured MCP error result —
+    // never an exception, never a crash, and the server stays connected.
+    const bad = await client.callTool({ name: 'set_intent', arguments: { kind: 'vector', x: 'north' } });
+    expect(bad.isError).toBe(true);
+    expect((bad.content as { text: string }[])[0]!.text).toMatch(/-32602|validation/i);
+    const stillAlive = await client.callTool({ name: 'get_state', arguments: {} });
+    expect(stillAlive.isError).toBeFalsy();
     await close();
   });
 

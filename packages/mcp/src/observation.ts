@@ -463,7 +463,12 @@ export class PerceptionGate {
     private readonly h: ResolvedHandicap,
     private readonly content?: ContentBundle,
   ) {
-    this.ring = new Array<Observation | undefined>(h.observationDelayTicks + 1);
+    // AC-27.8: O(delay) frames. The sampling interval is included because the
+    // served frame is the delayed frame rounded DOWN to a sampling boundary, which
+    // can be up to interval-1 frames older still.
+    this.ring = new Array<Observation | undefined>(
+      h.observationDelayTicks + h.observationIntervalTicks + 1,
+    );
   }
 
   /** Number of frames currently retained. */

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createRun } from '@megabonk/sim';
+import { content } from '@megabonk/content';
 import type { Enemy, GameState } from '@megabonk/sim';
 import { resolveHandicap } from '../src/handicap.js';
 import { PerceptionGate, hpBucketFor, observeState, sectorName } from '../src/observation.js';
@@ -125,6 +126,69 @@ describe('FR-27 perception handicap', () => {
     expect([...free].filter((k) => FORBIDDEN.test(k))).toEqual([]);
   });
 
+  it('AC-27.7: projectile headings are DERIVED from vel — the raw vector never ships', () => {
+    const s = stateWith(0, [], cfg(), {
+      projectiles: [
+        { id: 7, pos: { x: 3.1, y: 0.1 }, vel: { x: -9, y: 0.4 }, damage: 12, radius: 0.3, ttl: 40 },
+      ],
+    });
+    const obs = observeState(s, H, { frame: 0 });
+    const p = obs.projectiles[0]!;
+    expect(allKeys(obs).has('vel')).toBe(false);
+    expect(p.heading).toBe('W');
+    expect(p.speed).toBe(9); // |(-9, 0.4)| = 9.0089, quantised to the 0.25 grid
+    expect(p.ticksToLive).toBe(40);
+    expect('dir' in p).toBe(false);
+    expect('damage' in p).toBe(false);
+    // Unrestricted is allowed the exact heading — still derived, never `vel`.
+    const free = observeState(s, FREE, { frame: 0 }).projectiles[0]!;
+    expect(free.dir?.x).toBeCloseTo(-0.9990, 3);
+    // Off-screen shots are invisible, like everything else off-screen (AC-27.3).
+    const far = stateWith(0, [], cfg(), {
+      projectiles: [
+        { id: 8, pos: { x: 40, y: 0 }, vel: { x: -9, y: 0 }, damage: 1, radius: 0.3, ttl: 9 },
+      ],
+    });
+    expect(observeState(far, H, { frame: 0 }).projectiles).toEqual([]);
+  });
+
+  it('FR-27: an enemy reports whether it is ranged, but never its shot cooldown', () => {
+    const s = stateWith(0, [enemyAt(1, { x: 3, y: 0 }, { kind: 'lobber' }), enemyAt(2, { x: 4, y: 0 })]);
+    const obs = observeState(s, H, { frame: 0, content });
+    expect(obs.enemies.find((e) => e.id === 1)?.ranged).toBe(true);
+    expect(obs.enemies.find((e) => e.id === 2)?.ranged).toBe(false);
+    const keys = allKeys(obs);
+    expect(keys.has('cooldownTicks')).toBe(false);
+    expect(keys.has('attackCooldown')).toBe(false);
+  });
+
+  it('AC-27.3: chests and shrines are viewport-filtered like everything else', () => {
+    const s = stateWith(0, [], cfg(), {
+      interactables: [
+        { id: 1, kind: 'chest', pos: { x: 6, y: 1 }, used: false },
+        { id: 2, kind: 'shrine', pos: { x: 55, y: 0 }, used: false, shrineId: 'might' },
+      ],
+    });
+    const obs = observeState(s, H, { frame: 0 });
+    expect(obs.interactables.map((i) => i.id)).toEqual([1]);
+    expect(observeState(s, FREE, { frame: 0 }).interactables.map((i) => i.id)).toEqual([1, 2]);
+  });
+
+  it('FR-14/27: buff duration is reported in ticks, never wall clock', () => {
+    const s = stateWith(600, [], cfg());
+    const withBuff: typeof s = {
+      ...s,
+      player: {
+        ...s.player,
+        buffs: [{ id: 'might', expiresAtTick: 900, mods: [{ stat: 'might', kind: 'mult', value: 1.5 }] }],
+      },
+    };
+    const buff = observeState(withBuff, H, { frame: 600 }).player.buffs[0]!;
+    expect(buff.ticksRemaining).toBe(300);
+    expect(buff.secondsRemaining).toBe(5);
+    expect(buff.mods[0]?.stat).toBe('might');
+  });
+
   it('AC-24.5: unspawned waves, the RNG streams and the raw offer pool are never present', () => {
     const s = createRun(cfg(3));
     const obs = observeState(s, H, { frame: 0 });
@@ -156,14 +220,16 @@ describe('FR-27 perception handicap', () => {
     expect(obs.visibleEnemies).toBe(60);
   });
 
-  it('AC-27.8: the delay buffer is capped at delayTicks+1 frames and stays under 4 MB', () => {
+  it('AC-27.8: the delay buffer is capped at O(delayTicks) frames and stays under 4 MB', () => {
     const swarm: Enemy[] = [];
     for (let i = 0; i < 2000; i++) {
       swarm.push(enemyAt(i + 1, { x: (i % 50) * 0.5 - 12, y: Math.floor(i / 50) * 0.3 - 6 }));
     }
     const gate = new PerceptionGate(H);
     for (let t = 0; t < 500; t++) gate.record(stateWith(t, swarm));
-    expect(gate.size).toBeLessThanOrEqual(H.observationDelayTicks + 1);
+    expect(gate.size).toBeLessThanOrEqual(
+      H.observationDelayTicks + H.observationIntervalTicks + 1,
+    );
     expect(gate.byteSize()).toBeLessThan(4 * 1024 * 1024);
   });
 

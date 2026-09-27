@@ -10,12 +10,12 @@ import { characters, content, DEFAULT_CHARACTER } from '@megabonk/content';
 import { combatArchetypes, utilityArchetypes, pickCost, scaleArchetypes } from './builds.js';
 import { dominationRatio, measureDps } from './dps.js';
 import { formatReport, report, runMany, seedRange } from './harness.js';
-import { chargePolicy, kitePolicy, stationaryPolicy } from './policies.js';
+import { chargePolicy, kitePolicy, stationaryPolicy, wanderPolicy } from './policies.js';
 
 const seeds = seedRange(1, Number(process.argv[2] ?? 12));
 const maxSeconds = Number(process.argv[3] ?? 900);
 
-for (const policy of [kitePolicy(), chargePolicy(), stationaryPolicy()]) {
+for (const policy of [kitePolicy(), wanderPolicy(), chargePolicy(), stationaryPolicy()]) {
   const results = runMany(seeds, policy, { maxSeconds, sampleEvery: 60 });
   console.log(formatReport(report(results, maxSeconds)));
   console.log('');

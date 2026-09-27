@@ -17,11 +17,20 @@
 
 import type { ContentBundle, EnemyDef, RunConfig } from '@megabonk/sim';
 
-/** Zero enemy contact damage, so any policy survives to the biome duration. */
+/**
+ * Zero enemy contact damage, so any policy survives to the biome duration.
+ *
+ * Ranged attacks are removed rather than zeroed: a projectile hit applies
+ * `max(1, damage - armour)`, so a zero-damage shot still chips 1 HP per hit and a
+ * "harmless" scenario would quietly kill a stationary player. Dropping `ranged`
+ * is the only way to get a population that genuinely cannot end the run.
+ */
 export function harmlessContent(content: ContentBundle): ContentBundle {
   const enemies: Record<string, EnemyDef> = {};
   for (const [id, def] of Object.entries(content.enemies)) {
-    enemies[id] = { ...def, damage: 0 };
+    const { ranged: _ranged, ...rest } = def;
+    void _ranged;
+    enemies[id] = { ...rest, damage: 0 };
   }
   return { ...content, enemies };
 }

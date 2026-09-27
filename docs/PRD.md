@@ -26,7 +26,7 @@ Every decision in this document descends from these:
 ### 1.2 Decisions taken
 
 - **Renderer:** 2.5D on HTML5 canvas (top-down/isometric projection, no WebGL, no 3D physics). "3D verticality" is cut from v1 — it is a large cost multiplier for a TDD prototype and none of the core loop depends on it. Elevation is retained as a *data* concept (tiles have a height value affecting line-of-sight and movement cost) so a 3D renderer could be swapped in later without changing the simulation.
-- **Agent role:** **Advisor + optional autonomous player.** Not a co-op second player. The agent reads run state and either (a) recommends upgrade picks and movement to the human, or (b) drives the character itself in autonomous mode. Autonomous mode doubles as the integration-test driver and the balance-tuning harness. This avoids a multi-entity networked simulation entirely.
+- **Agent role:** **Advisor + optional autonomous player.** Not a co-op second player. The agent reads run state and either (a) recommends upgrade picks and movement to the human, or (b) drives the character itself in autonomous mode. Autonomous mode doubles as the integration-test driver and the balance-tuning harness. This avoids a multi-entity networked simulation entirely. The agent plays under a **human-parity handicap** (§6.8): degraded perception and capped actuation, so its performance is comparable to a skilled human's rather than superhuman.
 - **Content model:** all content (items, weapons, enemies, waves) is declarative data validated against a schema. v1 ships a small roster; scaling the roster is authoring work, not engineering work.
 
 ---
@@ -58,7 +58,8 @@ These replace the retention/refund KPIs of the previous draft, which had no prod
 | Sim step with 2000 live entities | < 8 ms p95 in Node |
 | Browser frame time at 1500 entities | < 16 ms p95 |
 | `npm install && npm start` on a clean clone | works, zero manual steps |
-| Autonomous agent run completion rate | ≥ 80% of runs reach the 10-minute mark |
+| Autonomous agent run completion rate (handicap on) | ≥ 80% of runs reach the 10-minute mark |
+| Autonomous agent survival vs. human baseline (handicap on) | median run duration within ±25% of the human median over 20 seeds |
 
 ---
 
@@ -354,7 +355,7 @@ final = clamp(  (base + Σ flat)  *  Π mult  )
 - AC-24.2 `choose_upgrade` with no offer pending returns an error and mutates nothing.
 - AC-24.3 `choose_upgrade` with an out-of-range index returns an error and mutates nothing.
 - AC-24.4 In advisor mode, every write tool is absent from `tools/list` — not merely rejected at call time.
-- AC-24.5 `get_state` never exposes information the human player cannot see (unspawned waves, future offers, the raw RNG state). The agent plays under the same information constraints as the human.
+- AC-24.5 `get_state` never exposes information the human player cannot see (unspawned waves, future offers, the raw RNG state), and is additionally filtered by the perception handicap of FR-27. The agent's observation is a subset of what is on the human's screen — never a superset.
 - AC-24.6 `get_state` response is < 8 KB at 2000 live entities — the nearby-enemy list is capped at 24.
 
 **FR-25 Latency and the tick model.** *The question the previous draft never asked.*
@@ -369,6 +370,84 @@ The simulation **does not wait for the agent**. `set_intent` is level-triggered:
 **FR-26 Autonomous mode.** `npm run agent:auto -- --seed=N` drives a full headless run via the MCP tool surface and prints a `RunSummary`.
 - AC-26.1 A scripted baseline policy (always pick option 0, kite nearest enemy) completes a full 900 s run without error.
 - AC-26.2 The same policy + same seed produces an identical summary across runs. *This makes the agent path itself a regression test.*
+
+### 6.8 Agent parity handicap
+
+*Resolves open question #1 of the previous revision: the agent is deliberately degraded to
+human-comparable capability. The goal is an agent that plays **like a good player**, not one that
+wins by reading state at 60 Hz with perfect global vision and frame-perfect reactions.*
+
+Two principles govern the whole section:
+
+1. **Everything is measured in sim ticks, never milliseconds of wall clock.** A wall-clock reaction
+   delay would make the agent path non-deterministic and destroy AC-26.2 and the golden-run corpus.
+   Latencies are declared in ms in config purely for human readability and converted to an integer
+   tick count at run start (`ticks = round(ms / 16.667)`).
+2. **The handicap lives in the observation/action boundary, never in `packages/sim`.** The
+   simulation has no concept of "agent" or "handicap"; it only ever sees an `InputFrame`. The
+   handicap is a filter applied by `packages/mcp` on the way out and a queue applied on the way in.
+   This keeps the sim pure (ARCH-1) and lets the same simulation serve a human, a handicapped agent,
+   and an unhandicapped debug agent identically.
+
+**FR-27 Perception handicap.**
+
+| Constraint | v1 default | Rationale |
+|---|---|---|
+| Observation delay | 12 ticks (200 ms) | Human visual→motor reaction time. `get_state` returns the snapshot from `currentTick − 12`, not the live one. |
+| Observation rate | 30 Hz (every 2nd tick) | The agent cannot sample faster than a human perceives distinct frames; repeat calls within the same window return the same cached snapshot. |
+| Vision | On-screen only — entities inside the camera viewport, plus a 10% margin | A human cannot see off-screen enemies. Global awareness is the single largest source of superhuman play. |
+| Enemy HP | Bucketed to 5 levels (`full`, `high`, `mid`, `low`, `critical`) | The human sees a health bar, not an integer. Exact HP is exposed **only** for bosses, which display a numeric bar. |
+| Position precision | Quantised to the render pixel grid (0.25 world units) | The human reads positions off a rasterised screen. |
+| Enemy intent | Not exposed. No `nextAttackTick`, no velocity vector, no AI state | A human infers these from animation; the agent must infer them from successive snapshots too. |
+| Off-screen audio cues | A coarse directional hint only (8 compass sectors, no distance) | Matches what the SFX layer conveys. |
+
+- AC-27.1 `get_state` at tick 1000 returns data identical to a snapshot captured at tick 988. An enemy spawned at tick 995 is absent from that response.
+- AC-27.2 Two `get_state` calls within the same 2-tick observation window return byte-identical payloads, and the second does not advance any cursor.
+- AC-27.3 An enemy outside the camera viewport + 10% margin is absent from `get_state.enemies`, even when within weapon range.
+- AC-27.4 A non-boss enemy at 47/100 HP reports `hpBucket: "mid"` and carries no numeric `hp` field at all — the field is absent, not zeroed, so a policy cannot accidentally read 0.
+- AC-27.5 A boss reports exact `hp` and `maxHp`.
+- AC-27.6 All reported positions are exact multiples of 0.25.
+- AC-27.7 No key anywhere in the `get_state` payload matches `/velocity|intent|nextAttack|aiState|seed|rng/i`. Enforced as a schema test over a full recorded run, not a spot check.
+- AC-27.8 The delayed-snapshot buffer costs O(delayTicks) memory and is capped; at 2000 entities and 12 ticks of delay it stays under 4 MB.
+
+**FR-28 Actuation handicap.**
+
+| Constraint | v1 default | Rationale |
+|---|---|---|
+| Action delay | 5 ticks (~83 ms) | Decision→keypress→engine latency. An action submitted at tick T applies at T+5. |
+| Intent change rate | ≤ 8 per second | A human cannot meaningfully redirect more often than this. Excess calls are rejected, not queued — queueing would let an agent bank a burst. |
+| Movement granularity | 8 compass directions only | Matches the keyboard's actual expressive range (FR-7). No arbitrary-angle vectors. |
+| Upgrade decision floor | ≥ 30 ticks (500 ms) on the offer screen before `choose_upgrade` is accepted | A human must at least read three cards. Prevents instant-optimal picking. |
+| Aim | Not available | Attacks are automatic (FR-1); there is no aim channel for either player. Listed for completeness so no one adds one for the agent alone. |
+
+- AC-28.1 `set_intent` at tick 100 leaves the player's movement unchanged through tick 104 and takes effect at tick 105.
+- AC-28.2 A 9th `set_intent` within one second is rejected with a structured rate-limit error; the 8 accepted ones all applied, and the rejection mutates nothing.
+- AC-28.3 An intent vector of `(0.31, 0.95)` is snapped to the nearest of the 8 compass directions; a policy cannot express a 17° heading.
+- AC-28.4 `choose_upgrade` called 20 ticks after the offer opened is rejected with a "too early" error and the offer remains pending; the same call at tick 30 succeeds.
+- AC-28.5 With the handicap active, a full autonomous run remains deterministic: same seed + same policy → identical `RunSummary` across 100 executions.
+
+**FR-29 Handicap configuration and disclosure.**
+
+The handicap is a named profile, not scattered constants, and which profile ran is **recorded in the
+run summary**. Comparing a handicapped run against an unhandicapped one otherwise silently poisons
+every balance conclusion.
+
+Profiles: `human-parity` (the FR-27/FR-28 defaults, the shipped default), `unrestricted` (all
+filters off — for debugging the sim and for deliberately measuring the performance ceiling), and
+`custom` (explicit overrides).
+
+- AC-29.1 `RunSummary` carries `agentProfile` and the fully-resolved handicap parameters. A run driven by a human records `agentProfile: null`.
+- AC-29.2 The default profile when none is specified is `human-parity`. `unrestricted` must be requested explicitly, by name, on the command line — never reachable by omitting a flag.
+- AC-29.3 Starting a run under `unrestricted` emits a `run_start` event with `handicap: "unrestricted"` and prints a one-line warning to stderr.
+- AC-29.4 The balance harness refuses to aggregate runs across differing profiles and errors out naming the mismatch, rather than averaging them.
+- AC-29.5 Advisor mode applies the FR-27 perception handicap to `get_state` too — an advisor with global vision and zero delay is a wallhack with extra steps, and its advice would be unreachable for the human acting on it.
+
+**FR-30 Parity validation.** The claim "comparable to a human" is measured, not asserted.
+
+- AC-30.1 A recorded corpus of ≥ 10 human runs (seed + input log, committed) establishes a baseline median duration and median level reached.
+- AC-30.2 The baseline policy under `human-parity` lands within ±25% of the human median duration over the same 20 seeds. A result far above the band is a handicap leak and fails CI; far below means the policy or the handicap needs work and is reported, not failed.
+- AC-30.3 The same policy under `unrestricted` performs measurably better than under `human-parity`. If it does not, the handicap is not actually binding and the test fails — this is the check that catches a handicap silently wired to a no-op.
+
 
 ---
 
@@ -440,9 +519,9 @@ Risk-ordered, not content-ordered. The previous draft's M1 ("core loop + one bio
 | **M1 Deterministic core** | `step()`, seeded RNG streams, entity store, state serialisation. **No rendering, no content.** | 1000-seed determinism suite passes; serialise→step round-trip property holds |
 | **M2 Combat loop** | Movement, targeting, damage, death, XP, levelling, offers, rarity/Luck | FR-1..FR-4 acceptance criteria pass headless; still no renderer |
 | **M3 Renderer** | Canvas view, HUD, input, upgrade screen | Playable by a human; same seed + same inputs → same result as headless |
-| **M4 MCP server** | Tool surface, advisor overlay, autonomous mode | FR-22..FR-26 pass; baseline policy completes a full run; agent path is in CI |
+| **M4 MCP server** | Tool surface, advisor overlay, autonomous mode, human-parity handicap | FR-22..FR-29 pass; baseline policy completes a full run under `human-parity`; agent path is in CI. FR-30 parity validation lands in M6, once a human baseline corpus exists to measure against. |
 | **M5 Content + economy** | 3 weapons, 4 tomes, 8 items, 6 enemies, boss, gold, merchant, chests, shrines | Content schema validation green; golden-run corpus established |
-| **M6 Meta + polish** | Silver, save file, 3 unlocks, 12 quests, run summary, accessibility pass | Full acceptance suite green; coverage and perf targets met |
+| **M6 Meta + polish** | Silver, save file, 3 unlocks, 12 quests, run summary, accessibility pass, human baseline corpus | Full acceptance suite green incl. FR-30 parity validation; coverage and perf targets met |
 
 M1 and M2 shipping with no renderer is intentional and is the point of the whole plan: the simulation must be provably correct before anything draws it.
 
@@ -466,7 +545,7 @@ M1 and M2 shipping with no renderer is intentional and is the point of the whole
 
 Build questions, not publisher questions.
 
-1. **Autonomous-agent difficulty parity** — should the agent's `get_state` be deliberately degraded (reaction delay, limited vision) so its performance is comparable to a human's, or is a superhuman agent the point?
+1. **Handicap defaults** — are the FR-27/FR-28 numbers (200 ms observation delay, 30 Hz sampling, 8 intent changes/s, 500 ms decision floor) right? They are first-principles estimates from human reaction-time literature, and AC-30.2 is the instrument that will tell us. Expect to tune them once the human baseline corpus exists.
 2. **Offer timeout default** — is 30 s right for autonomous mode, and should advisor mode have any timeout at all?
 3. **Replay artifact** — ship replays as `seed + input log` (tiny, requires identical build) or as periodic state snapshots (robust across versions, much larger)?
 4. **Elevation** — is the data-only elevation of FR-8 worth its complexity in v1, or should it be cut entirely and reintroduced with a real 3D renderer?
@@ -493,6 +572,7 @@ Build questions, not publisher questions.
 | §6.3 FR-9 explicit stat composition order | The hardest correctness problem in the genre, previously unaddressed |
 | §6.7 the entire MCP section | A stated constraint with zero prior coverage |
 | FR-25 agent latency and tick model | The unasked question that determines whether the feature is usable |
+| §6.8 FR-27..FR-30 agent parity handicap | Degrades the agent to human-comparable perception and actuation, in ticks so determinism survives; includes the measured-parity tests that prove the handicap actually binds |
 | §8 local event log replacing telemetry | One mechanism serving agent, tests, summary, and balance |
 | §9 test strategy | TDD was asserted but never planned |
 | §10 risk-ordered milestones | Previous ordering bundled architecture with content |

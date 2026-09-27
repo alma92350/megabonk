@@ -85,3 +85,24 @@ describe('theme', () => {
     expect(lum(THEME.text) - lum(THEME.panel)).toBeGreaterThan(0.6);
   });
 });
+
+describe('ranged enemies look different because they behave differently', () => {
+  it('swaps in a caster silhouette when the enemy is ranged', () => {
+    expect(enemyVisual('lobber').shape).not.toBe('caster');
+    expect(enemyVisual('lobber', true).shape).toBe('caster');
+  });
+
+  it('keeps the body colour so the archetype is still identifiable', () => {
+    expect(enemyVisual('lobber', true).body).toBe(enemyVisual('lobber').body);
+  });
+});
+
+describe('enemyVisual allocates nothing per entity per frame', () => {
+  it('returns the same object for repeated melee lookups', () => {
+    expect(enemyVisual('grunt')).toBe(enemyVisual('grunt'));
+  });
+
+  it('caches the ranged variant instead of spreading a new object each call', () => {
+    expect(enemyVisual('lobber', true)).toBe(enemyVisual('lobber', true));
+  });
+});

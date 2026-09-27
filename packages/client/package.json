@@ -6,6 +6,7 @@
   "main": "src/index.ts",
   "dependencies": {
     "@megabonk/sim": "*",
-    "@megabonk/content": "*"
+    "@megabonk/content": "*",
+    "@megabonk/meta": "*"
   }
 }

@@ -9,6 +9,7 @@ export default defineConfig({
     alias: {
       '@megabonk/sim': resolve(root, 'packages/sim/src/index.ts'),
       '@megabonk/content': resolve(root, 'packages/content/src/index.ts'),
+      '@megabonk/meta': resolve(root, 'packages/meta/src/index.ts'),
     },
   },
   server: { port: 5173, host: '127.0.0.1', open: false },

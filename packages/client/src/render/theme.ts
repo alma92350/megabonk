@@ -116,9 +116,19 @@ const FALLBACK_ENEMY: EnemyVisual = Object.freeze({
  * swarming), and a player who cannot see why an enemy stopped approaching reads
  * it as a bug. Behaviour that differs must look different.
  */
+const rangedVariants = new Map<string, EnemyVisual>();
+
 export function enemyVisual(kind: string, isRanged = false): EnemyVisual {
   const base = ENEMY_VISUALS[kind] ?? FALLBACK_ENEMY;
-  return isRanged ? { ...base, shape: 'caster' } : base;
+  if (!isRanged) return base;
+  // Cached, not spread per call: this runs once per enemy per frame, and at 1500
+  // entities a fresh object here is 90k allocations a second.
+  let variant = rangedVariants.get(kind);
+  if (variant === undefined) {
+    variant = { ...base, shape: 'caster' };
+    rangedVariants.set(kind, variant);
+  }
+  return variant;
 }
 
 /** Enemy shots. Deliberately NOT the biome accent — hostile reads as hot pink. */

@@ -24,6 +24,8 @@ export interface Ctx2D {
   globalCompositeOperation: string;
   shadowBlur: number;
   shadowColor: string;
+  /** Present in Chromium and Firefox; absent elsewhere, so always feature-checked. */
+  letterSpacing?: string;
 
   save(): void;
   restore(): void;

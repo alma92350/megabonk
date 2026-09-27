@@ -139,3 +139,49 @@ describe('HUD model reads only from the snapshot (AC-18.1)', () => {
     expect(hud.goldText).toBe('25k');
   });
 });
+
+describe('FR-14 timed buffs in the HUD', () => {
+  const config = makeRunConfig(12);
+  const base = createRun(config);
+
+  it('is empty with no buffs', () => {
+    expect(buildHud(base, content).buffs).toEqual([]);
+  });
+
+  it('counts the remaining time down in sim TICKS, not wall clock', () => {
+    const state = {
+      ...base,
+      tick: 600,
+      player: {
+        ...base.player,
+        buffs: [{ id: 'haste', expiresAtTick: 600 + 90, mods: [] }],
+      },
+    };
+    const buff = buildHud(state, content).buffs[0]!;
+    expect(buff.secondsLeft).toBeCloseTo(1.5, 6);
+    expect(buff.text).toBe('2s');
+    expect(buff.id).toBe('haste');
+  });
+
+  it('never reports negative time for an already-expired buff', () => {
+    const state = {
+      ...base,
+      tick: 1000,
+      player: { ...base.player, buffs: [{ id: 'haste', expiresAtTick: 10, mods: [] }] },
+    };
+    expect(buildHud(state, content).buffs[0]!.secondsLeft).toBe(0);
+  });
+
+  it('falls back to the raw id when the content bundle ships no shrines', () => {
+    const state = {
+      ...base,
+      player: { ...base.player, buffs: [{ id: 'mystery', expiresAtTick: 60, mods: [] }] },
+    };
+    expect(buildHud(state, content).buffs[0]!.name).toBe('mystery');
+  });
+
+  it('surfaces queued chest rewards', () => {
+    expect(buildHud(base, content).pendingChests).toBe(0);
+    expect(buildHud({ ...base, queuedChestOffers: 2 }, content).pendingChests).toBe(2);
+  });
+});

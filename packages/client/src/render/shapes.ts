@@ -165,5 +165,12 @@ export function pathRaritySigil(ctx: Ctx2D, shape: RarityShape, x: number, y: nu
 
 /** A flat contact ellipse. Adds a whole dimension for the price of one fill. */
 export function pathContactShadow(ctx: Ctx2D, x: number, y: number, rx: number): void {
-  ctx.ellipse(x, y, rx, Math.max(1, rx * 0.42), 0, 0, Math.PI * 2);
+  const ry = Math.max(1, rx * 0.42);
+  // moveTo FIRST. Every shadow in the frame shares one path for batching, and
+  // ellipse() appends to the current subpath: without this, each ellipse is
+  // joined to the previous one by a straight line, and the fill renders those
+  // connectors as long black wedges across the screen. The batching optimisation
+  // is what makes this necessary — a per-entity beginPath would hide it.
+  ctx.moveTo(x + rx, y);
+  ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
 }

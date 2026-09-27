@@ -16,8 +16,27 @@ function client(storage: MemoryStorage | null = new MemoryStorage()): GameClient
   return new GameClient({ storage, viewport: { width: 960, height: 600 }, seedSource: () => 1234 });
 }
 
+/** A real key press: browsers always send a keyup, and the tracker relies on it. */
+function press(c: GameClient, code: string): void {
+  c.onKey(code, true);
+  c.onKey(code, false);
+}
+
+/**
+ * Advance n frames, taking the first upgrade whenever an offer opens. Without
+ * this a long run stalls on the offer screen, which is exactly what AC-19.2 says
+ * it should do.
+ */
+function autoplay(c: GameClient, frames: number, frameMs = TICK_MS): void {
+  for (let i = 0; i < frames; i++) {
+    if (c.state?.phase === 'offer') press(c, 'Digit1');
+    c.advance(frameMs);
+  }
+}
+
 function offerState(state: GameState): GameState {
   const offer: Offer = {
+    source: 'level',
     openedTick: state.tick,
     rerollsUsed: 0,
     options: [
@@ -47,16 +66,16 @@ describe('client lifecycle', () => {
   it('navigates the hub with the keyboard and wraps', () => {
     const c = client();
     expect(c.hubIndex).toBe(0);
-    c.onKey('ArrowUp', true);
+    press(c, 'ArrowUp');
     expect(c.hubIndex).toBe(c.hubEntries().length - 1);
-    c.onKey('ArrowDown', true);
+    press(c, 'ArrowDown');
     expect(c.hubIndex).toBe(0);
   });
 
   it('starts a run from the hub', () => {
     const c = client();
     c.hubIndex = c.hubEntries().length - 1;
-    c.onKey('Enter', true);
+    press(c, 'Enter');
     c.advance(TICK_MS);
     expect(c.screen).toBe('run');
     expect(c.state).not.toBeNull();
@@ -66,7 +85,7 @@ describe('client lifecycle', () => {
   it('refuses a purchase it cannot afford and says why', () => {
     const c = client();
     c.hubIndex = 0;
-    c.onKey('Enter', true);
+    press(c, 'Enter');
     expect(c.profile.purchased).toEqual([]);
     expect(c.notice).toMatch(/silver/i);
   });
@@ -77,7 +96,7 @@ describe('client lifecycle', () => {
     const c = client(storage);
     expect(c.profile.silver).toBe(1000);
     c.hubIndex = 0;
-    c.onKey('Enter', true);
+    press(c, 'Enter');
     expect(c.profile.purchased).toContain(UNLOCKS[0]!.id);
     expect(c.profile.silver).toBe(1000 - UNLOCKS[0]!.cost);
     expect(JSON.parse(storage.getItem(PROFILE_KEY)!).purchased).toContain(UNLOCKS[0]!.id);
@@ -101,12 +120,16 @@ describe('client lifecycle', () => {
 });
 
 describe('the run loop drives the sim on a fixed timestep', () => {
-  it('advances roughly one tick per 60Hz frame over 600 frames', () => {
+  it('advances exactly one tick per 60Hz frame over 600 frames', () => {
     const c = client();
     c.startRun();
-    for (let i = 0; i < 600; i++) c.advance(TICK_MS);
-    expect(c.state!.tick).toBe(600);
+    autoplay(c, 600);
+    // One step() call per frame, and no time lost: the only ticks that do not
+    // move the clock are the ones spent resolving an offer (AC-19.2).
     expect(c.totalTicks).toBe(600);
+    expect(c.droppedTicks).toBe(0);
+    expect(c.state!.tick).toBeGreaterThan(560);
+    expect(c.state!.tick).toBeLessThanOrEqual(600);
   });
 
   it('never advances more than the catch-up clamp in one frame', () => {
@@ -153,11 +176,11 @@ describe('the run loop drives the sim on a fixed timestep', () => {
     c.startRun();
     for (let i = 0; i < 10; i++) c.advance(TICK_MS);
     const at = c.state!.tick;
-    c.onKey('Escape', true);
+    press(c, 'Escape');
     for (let i = 0; i < 10; i++) c.advance(TICK_MS);
     expect(c.paused).toBe(true);
     expect(c.state!.tick).toBe(at);
-    c.onKey('Escape', true);
+    press(c, 'Escape');
     for (let i = 0; i < 10; i++) c.advance(TICK_MS);
     expect(c.state!.tick).toBeGreaterThan(at);
   });
@@ -188,7 +211,7 @@ describe('offer phase (FR-19 / AC-19.2)', () => {
     const c = client();
     c.startRun();
     c.state = offerState(c.state!);
-    c.onKey('Digit2', true);
+    press(c, 'Digit2');
     c.advance(TICK_MS);
     expect(c.state.phase).toBe('playing');
     expect(c.state.player.items.some((i) => i.id === 'boots')).toBe(true);
@@ -198,7 +221,7 @@ describe('offer phase (FR-19 / AC-19.2)', () => {
     const c = client();
     c.startRun();
     c.state = { ...offerState(c.state!), offer: { ...offerState(c.state!).offer!, options: [offerState(c.state!).offer!.options[0]!] } };
-    c.onKey('Digit3', true);
+    press(c, 'Digit3');
     expect(() => c.advance(TICK_MS)).not.toThrow();
     expect(c.state.phase).toBe('offer');
   });
@@ -208,11 +231,11 @@ describe('offer phase (FR-19 / AC-19.2)', () => {
     c.startRun();
     c.state = offerState(c.state!);
     expect(c.state.player.rerolls).toBe(0);
-    c.onKey('KeyR', true);
+    press(c, 'KeyR');
     c.advance(TICK_MS);
     expect(c.state.offer!.rerollsUsed).toBe(0);
     c.state = { ...c.state, player: { ...c.state.player, rerolls: 1 } };
-    c.onKey('KeyR', true);
+    press(c, 'KeyR');
     c.advance(TICK_MS);
     expect(c.state.offer!.rerollsUsed).toBe(1);
     expect(c.state.player.rerolls).toBe(0);
@@ -225,14 +248,14 @@ describe('AC-21.1 / AC-21.2 the advisor never touches the sim', () => {
     const a = client();
     a.startRun();
     a.onKey('KeyD', true);
-    for (let i = 0; i < 600; i++) a.advance(TICK_MS);
+    autoplay(a, 600);
     const without = JSON.stringify(a.state);
 
     setAdvice({ pickIndex: 2, headline: 'Take the third', rationale: 'It scales.' });
     const b = client();
     b.startRun();
     b.onKey('KeyD', true);
-    for (let i = 0; i < 600; i++) b.advance(TICK_MS);
+    autoplay(b, 600);
     expect(JSON.stringify(b.state)).toBe(without);
     clearAdvice();
   });
@@ -242,7 +265,7 @@ describe('AC-21.1 / AC-21.2 the advisor never touches the sim', () => {
     const c = client();
     c.startRun();
     c.state = offerState(c.state!);
-    c.onKey('Digit1', true);
+    press(c, 'Digit1');
     c.advance(TICK_MS);
     expect(c.state.phase).toBe('playing');
     clearAdvice();
@@ -298,10 +321,10 @@ describe('run summary (FR-20)', () => {
     const c = client();
     c.startRun();
     killPlayer(c);
-    c.onKey('KeyR', true);
+    press(c, 'KeyR');
     expect(c.screen).toBe('run');
     killPlayer(c);
-    c.onKey('Enter', true);
+    press(c, 'Enter');
     expect(c.screen).toBe('hub');
   });
 });
@@ -311,8 +334,9 @@ describe('headless 600-frame smoke (no DOM, no canvas)', () => {
     const c = client();
     c.startRun();
     c.onKey('KeyW', true);
-    for (let i = 0; i < 600; i++) c.advance(1000 / 60);
-    expect(c.state!.tick).toBeGreaterThanOrEqual(595);
+    autoplay(c, 600, 1000 / 60);
+    expect(c.totalTicks).toBe(600);
+    expect(c.state!.tick).toBeGreaterThan(560);
     expect(c.state!.tick / TICKS_PER_SECOND).toBeGreaterThan(9);
     const hud = c.hud()!;
     expect(hud.timeText).toMatch(/^\d+:\d\d$/);

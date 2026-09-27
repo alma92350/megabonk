@@ -4,8 +4,8 @@ import { createRng } from './rng.js';
 import { resolveBuild, type BuildInput } from './build.js';
 import { NO_UNLOCKS, type ContentBundle, type RunConfig } from './content-types.js';
 import { TICKS_PER_SECOND } from './rules.js';
-import type { GameState, HeldItem, Obstacle, RngStreams, Vec2 } from './types.js';
-import { nextRange } from './rng.js';
+import type { GameState, HeldItem, Interactable, Obstacle, RngStreams, Vec2 } from './types.js';
+import { nextInt, nextRange } from './rng.js';
 
 export const BASE_WEAPON_SLOTS = 3;
 
@@ -34,6 +34,7 @@ export function buildInputFor(state: GameState, config: RunConfig): BuildInput {
     items,
     tomes,
     bonusLuck: config.unlocks?.bonusLuck ?? 0,
+    buffs: state.player.buffs,
   };
 }
 
@@ -77,6 +78,48 @@ function generateObstacles(
   return { obstacles };
 }
 
+/**
+ * Scatter chests and shrines. Placed once at mapgen rather than spawned over
+ * time, so exploring the map has a standing reward and the layout is knowable.
+ */
+function placeInteractables(
+  rngIn: ReturnType<typeof createRng>,
+  chestCount: number,
+  shrineCount: number,
+  shrineIds: readonly string[],
+  halfExtent: number,
+  obstacles: readonly Obstacle[],
+  firstId: number,
+): { interactables: Interactable[]; nextId: number } {
+  let rng = rngIn;
+  const out: Interactable[] = [];
+  let nextId = firstId;
+  const want = chestCount + (shrineIds.length > 0 ? shrineCount : 0);
+  let attempts = 0;
+
+  while (out.length < want && attempts < want * 40) {
+    attempts++;
+    const rx = nextRange(rng, -halfExtent + 3, halfExtent - 3);
+    rng = rx.state;
+    const ry = nextRange(rng, -halfExtent + 3, halfExtent - 3);
+    rng = ry.state;
+    const pos: Vec2 = { x: rx.value, y: ry.value };
+    if (Math.hypot(pos.x, pos.y) < 10) continue; // make the player travel for it
+    if (obstacles.some((o) => Math.hypot(o.pos.x - pos.x, o.pos.y - pos.y) < o.radius + 2)) continue;
+    if (out.some((i) => Math.hypot(i.pos.x - pos.x, i.pos.y - pos.y) < 8)) continue;
+
+    const isChest = out.filter((i) => i.kind === 'chest').length < chestCount;
+    if (isChest) {
+      out.push({ id: nextId++, kind: 'chest', pos, used: false });
+    } else {
+      const pick = nextInt(rng, shrineIds.length);
+      rng = pick.state;
+      out.push({ id: nextId++, kind: 'shrine', pos, used: false, shrineId: shrineIds[pick.value]! });
+    }
+  }
+  return { interactables: out, nextId };
+}
+
 export function createRun(config: RunConfig): GameState {
   const { content, seed } = config;
   const biome = content.biomes[config.biomeId];
@@ -90,6 +133,17 @@ export function createRun(config: RunConfig): GameState {
   const unlocks = config.unlocks ?? NO_UNLOCKS;
   const rng = makeStreams(seed);
   const { obstacles } = generateObstacles(rng.mapgen, biome.obstacleCount, biome.halfExtent);
+
+  const shrineIds = Object.keys(content.shrines ?? {}).sort();
+  const placed = placeInteractables(
+    rng.mapgen,
+    biome.chestCount ?? 0,
+    biome.shrineCount ?? 0,
+    shrineIds,
+    biome.halfExtent,
+    obstacles,
+    1,
+  );
 
   const { stats, modifiers } = resolveBuild(
     { characterId: config.characterId, items: [], tomes: {}, bonusLuck: unlocks.bonusLuck },
@@ -115,13 +169,16 @@ export function createRun(config: RunConfig): GameState {
       facing: { x: 1, y: 0 },
       stats,
       modifiers,
+      buffs: [],
     },
     enemies: [],
     pickups: [],
+    interactables: placed.interactables,
     map: { halfExtent: biome.halfExtent, obstacles },
     offer: null,
     queuedOffers: 0,
-    nextId: 1,
+    queuedChestOffers: 0,
+    nextId: placed.nextId,
     kills: 0,
     bossKills: 0,
     damageDealt: 0,

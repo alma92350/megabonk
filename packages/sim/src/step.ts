@@ -14,7 +14,7 @@
 
 import { nextFloat, nextInt, nextRange, weightedPick, type RngState } from './rng.js';
 import { grantXp } from './progression.js';
-import { applyMovement, distance, normalise, selectTarget } from './combat.js';
+import { applyMovement, distance, normalise, selectTargetIndex } from './combat.js';
 import { resolveStats, BASE_STATS } from './stats.js';
 import { activeConditions, collectModifiers } from './build.js';
 import { buildOffer } from './offers.js';
@@ -30,10 +30,12 @@ import {
 } from './rules.js';
 import type { ContentBundle, RunConfig, WavePhase } from './content-types.js';
 import type {
+  ActiveBuff,
   Enemy,
   GameState,
   HeldItem,
   InputFrame,
+  Interactable,
   MerchantStockEntry,
   OfferOption,
   Pickup,
@@ -54,6 +56,7 @@ interface Mut {
   events: SimEvent[];
   enemies: Enemy[];
   pickups: Pickup[];
+  interactables: Interactable[];
   nextId: number;
   kills: number;
   bossKills: number;
@@ -173,19 +176,18 @@ function moveEnemies(m: Mut, state: GameState, dtSeconds: number): void {
     // rather than a single stacked point. Grid-limited, so it stays O(n·k).
     let sx = 0;
     let sy = 0;
-    const neighbours = grid.near(e.pos);
-    for (const other of neighbours) {
-      if (other.id === e.id || other.hp <= 0) continue;
+    grid.forEachNear(e.pos, (other) => {
+      if (other.id === e.id || other.hp <= 0) return;
       const dx = e.pos.x - other.pos.x;
       const dy = e.pos.y - other.pos.y;
-      const d = Math.hypot(dx, dy);
+      const d = Math.sqrt(dx * dx + dy * dy);
       const minD = e.radius + other.radius;
       if (d > 0 && d < minD) {
         const push = (minD - d) / minD;
         sx += (dx / d) * push;
         sy += (dy / d) * push;
       }
-    }
+    });
 
     const dir: Vec2 = { x: toward.x + sx * 1.6, y: toward.y + sy * 1.6 };
     const pos = applyMovement(e.pos, dir, e.speed, dtSeconds, state.map, e.radius * 0.5);
@@ -218,9 +220,7 @@ function runWeapons(
     let hits = 0;
     // Re-select per hit so a swing that kills its target rolls onto the next.
     for (let t = 0; t < targets; t++) {
-      const victim = selectTarget(player.pos, range, m.enemies);
-      if (!victim) break;
-      const idx = m.enemies.findIndex((e) => e.id === victim.id);
+      const idx = selectTargetIndex(player.pos, range, m.enemies);
       if (idx < 0) break;
 
       const critRoll = nextFloat(m.rng.crit);
@@ -421,23 +421,110 @@ function applyOption(
   return { ...player, items: [...player.items, held] };
 }
 
+/** Chests are the reward for exploring, so they roll with a Luck bonus. */
+const CHEST_LUCK_BONUS = 8;
+
 function openOfferIfQueued(
   m: Mut,
   state: GameState,
   config: RunConfig,
   player: PlayerState,
   queued: number,
-): { phase: 'playing' | 'offer'; offer: GameState['offer']; queuedOffers: number } {
-  if (queued <= 0) return { phase: 'playing', offer: null, queuedOffers: 0 };
+  queuedChests: number,
+): {
+  phase: 'playing' | 'offer';
+  offer: GameState['offer'];
+  queuedOffers: number;
+  queuedChestOffers: number;
+} {
+  if (queued <= 0 && queuedChests <= 0) {
+    return { phase: 'playing', offer: null, queuedOffers: 0, queuedChestOffers: 0 };
+  }
+  // Chests first: the player just walked across the map for it, so it should not
+  // be buried behind a level-up queue.
+  const fromChest = queuedChests > 0;
   const probe: GameState = { ...state, player };
-  const built = buildOffer(probe, config.content, weaponSlotsFor(config), m.rng.upgradeOffer);
+  const built = buildOffer(
+    probe,
+    config.content,
+    weaponSlotsFor(config),
+    m.rng.upgradeOffer,
+    fromChest ? CHEST_LUCK_BONUS : 0,
+  );
   m.rng.upgradeOffer = built.rng;
-  emit(m, state.tick + 1, 'offer_presented', { options: built.options.map((o) => o.id) });
+  emit(m, state.tick + 1, fromChest ? 'chest_opened' : 'offer_presented', {
+    options: built.options.map((o) => o.id),
+  });
+  if (fromChest) {
+    emit(m, state.tick + 1, 'offer_presented', { options: built.options.map((o) => o.id) });
+  }
   return {
     phase: 'offer',
-    offer: { options: built.options, openedTick: state.tick + 1, rerollsUsed: 0 },
+    offer: {
+      options: built.options,
+      source: fromChest ? 'chest' : 'level',
+      openedTick: state.tick + 1,
+      rerollsUsed: 0,
+    },
     queuedOffers: queued,
+    queuedChestOffers: queuedChests,
   };
+}
+
+/**
+ * FR-14 interactables. Chests queue a curated offer; shrines charge gold and grant
+ * a timed buff. Both are resolved on contact — there is no interact key, because
+ * a key would need to exist for the agent too and adds nothing.
+ */
+function runInteractables(
+  m: Mut,
+  state: GameState,
+  config: RunConfig,
+  playerIn: PlayerState,
+): { player: PlayerState; chestsOpened: number } {
+  let player = playerIn;
+  let chestsOpened = 0;
+  const TOUCH_RADIUS = 1.4;
+
+  for (let i = 0; i < m.interactables.length; i++) {
+    const it = m.interactables[i]!;
+    if (it.used) continue;
+    if (distance(it.pos, player.pos) > TOUCH_RADIUS) continue;
+
+    if (it.kind === 'chest') {
+      m.interactables[i] = { ...it, used: true };
+      chestsOpened++;
+      continue;
+    }
+
+    const def = it.shrineId ? config.content.shrines?.[it.shrineId] : undefined;
+    if (!def) continue;
+    // Cannot pay: leave the shrine armed rather than consuming it for nothing.
+    if (player.gold < def.cost) continue;
+
+    const durationTicks = Math.round(def.durationSeconds * TICKS_PER_SECOND);
+    const expiresAtTick = state.tick + 1 + durationTicks;
+    const existing = player.buffs.find((b) => b.id === def.id);
+    const buffs: ActiveBuff[] =
+      existing && def.stackable !== true
+        ? player.buffs.map((b) => (b.id === def.id ? { ...b, expiresAtTick } : b))
+        : [...player.buffs, { id: def.id, expiresAtTick, mods: def.mods }];
+
+    player = { ...player, gold: player.gold - def.cost, buffs };
+    m.interactables[i] = { ...it, used: true };
+    emit(m, state.tick + 1, 'shrine_used', { shrine: def.id, cost: def.cost });
+    emit(m, state.tick + 1, 'gold_spent', { amount: def.cost, id: def.id });
+  }
+
+  return { player, chestsOpened };
+}
+
+/** Drop expired buffs. Returns null when nothing changed, so stats are not rebuilt needlessly. */
+function expireBuffs(player: PlayerState, tick: number): PlayerState | null {
+  if (player.buffs.length === 0) return null;
+  const live = player.buffs.filter((b) => b.expiresAtTick > tick);
+  if (live.length === player.buffs.length) return null;
+  return { ...player, buffs: live };
 }
 
 function maybeSpawnMerchant(state: GameState, config: RunConfig, m: Mut, seconds: number): GameState['merchant'] {
@@ -492,6 +579,7 @@ export function step(
     events: [],
     enemies: state.enemies.slice(),
     pickups: state.pickups.slice(),
+    interactables: state.interactables.slice(),
     nextId: state.nextId,
     kills: state.kills,
     bossKills: state.bossKills,
@@ -529,10 +617,20 @@ export function step(
     }
 
     player = refreshStats(applyOption(player, chosen, config.content), config, state);
-    queued -= 1;
-    emit(m, state.tick, 'offer_resolved', { id: chosen.id, kind: chosen.kind, rarity: chosen.rarity });
+    let queuedChests = state.queuedChestOffers;
+    // Consume from whichever queue this offer came out of.
+    if (offer.source === 'chest') queuedChests -= 1;
+    else queued -= 1;
+    emit(m, state.tick, 'offer_resolved', {
+      id: chosen.id, kind: chosen.kind, rarity: chosen.rarity, source: offer.source,
+    });
+    if (chosen.kind !== 'gold') {
+      emit(m, state.tick, 'item_acquired', { id: chosen.id, source: offer.source });
+    }
 
-    const opened = openOfferIfQueued(m, { ...state, tick: state.tick - 1 }, config, player, queued);
+    const opened = openOfferIfQueued(
+      m, { ...state, tick: state.tick - 1 }, config, player, queued, queuedChests,
+    );
     return {
       ...state,
       rng: m.rng,
@@ -541,6 +639,7 @@ export function step(
       phase: opened.phase,
       offer: opened.offer,
       queuedOffers: opened.queuedOffers,
+      queuedChestOffers: opened.queuedChestOffers,
       nextId: m.nextId,
     };
   }
@@ -579,10 +678,19 @@ export function step(
   // 6. Enemy contact damage.
   player = applyEnemyContact(m, { ...state, player }, player);
 
-  // 7. Merchant.
+  // 7. Interactables (chests, shrines) and buff expiry.
+  const interacted = runInteractables(m, { ...state, player }, config, player);
+  player = interacted.player;
+  if (interacted.player !== state.player && player.buffs !== state.player.buffs) {
+    player = refreshStats(player, config, state);
+  }
+  const expired = expireBuffs(player, state.tick + 1);
+  if (expired) player = refreshStats(expired, config, state);
+
+  // 8. Merchant.
   const merchant = maybeSpawnMerchant({ ...state, player }, config, m, seconds);
 
-  // 8. Purchases.
+  // 9. Purchases.
   let purchasedMerchant = merchant;
   if (input.buyIndex !== undefined && merchant) {
     const entry = merchant.stock[input.buyIndex];
@@ -598,39 +706,43 @@ export function step(
     }
   }
 
-  // 9. Termination, then offers — a lethal tick ends the run rather than opening
+  // 10. Termination, then offers — a lethal tick ends the run rather than opening
   //    an upgrade screen the player will never see.
   const tick = state.tick + 1;
   if (player.hp <= 0) {
     emit(m, tick, 'run_end', { outcome: 'died', seconds });
     return {
       ...state, tick, phase: 'ended', outcome: 'died', player: { ...player, hp: 0 },
-      enemies: m.enemies, pickups: m.pickups, merchant: purchasedMerchant, rng: m.rng,
+      enemies: m.enemies, pickups: m.pickups, interactables: m.interactables,
+      merchant: purchasedMerchant, rng: m.rng,
       nextId: m.nextId, kills: m.kills, bossKills: m.bossKills,
       damageDealt: m.damageDealt, damageTaken: m.damageTaken, goldEarned: m.goldEarned,
-      events: m.events, offer: null, queuedOffers: 0,
+      events: m.events, offer: null, queuedOffers: 0, queuedChestOffers: 0,
     };
   }
   if (seconds >= biome.durationSeconds) {
     emit(m, tick, 'run_end', { outcome: 'survived', seconds });
     return {
       ...state, tick, phase: 'ended', outcome: 'survived', player,
-      enemies: m.enemies, pickups: m.pickups, merchant: purchasedMerchant, rng: m.rng,
+      enemies: m.enemies, pickups: m.pickups, interactables: m.interactables,
+      merchant: purchasedMerchant, rng: m.rng,
       nextId: m.nextId, kills: m.kills, bossKills: m.bossKills,
       damageDealt: m.damageDealt, damageTaken: m.damageTaken, goldEarned: m.goldEarned,
-      events: m.events, offer: null, queuedOffers: 0,
+      events: m.events, offer: null, queuedOffers: 0, queuedChestOffers: 0,
     };
   }
 
   let phase: GameState['phase'] = 'playing';
   let offer = state.offer;
   let queuedOffers = state.queuedOffers + collected.levelsGained;
-  if (collected.levelsGained > 0) {
-    player = refreshStats(player, config, state);
-    const opened = openOfferIfQueued(m, state, config, player, queuedOffers);
+  let queuedChestOffers = state.queuedChestOffers + interacted.chestsOpened;
+  if (collected.levelsGained > 0 || interacted.chestsOpened > 0) {
+    if (collected.levelsGained > 0) player = refreshStats(player, config, state);
+    const opened = openOfferIfQueued(m, state, config, player, queuedOffers, queuedChestOffers);
     phase = opened.phase;
     offer = opened.offer;
     queuedOffers = opened.queuedOffers;
+    queuedChestOffers = opened.queuedChestOffers;
   }
 
   return {
@@ -639,9 +751,11 @@ export function step(
     phase,
     offer,
     queuedOffers,
+    queuedChestOffers,
     player,
     enemies: m.enemies,
     pickups: m.pickups,
+    interactables: m.interactables,
     merchant: purchasedMerchant,
     rng: m.rng,
     nextId: m.nextId,

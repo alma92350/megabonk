@@ -32,24 +32,43 @@ export function normalise(v: Vec2): Vec2 {
  */
 const RANGE_EPSILON = 1e-9;
 
+export function selectTargetIndex(
+  from: Vec2,
+  range: number,
+  enemies: readonly Enemy[],
+): number {
+  const maxSq = range * range + RANGE_EPSILON;
+  let bestIdx = -1;
+  let bestSq = Infinity;
+  let bestId = 0;
+  for (let i = 0; i < enemies.length; i++) {
+    const e = enemies[i]!;
+    if (e.hp <= 0) continue; // AC-1.3
+    const dx = from.x - e.pos.x;
+    const dy = from.y - e.pos.y;
+    const dSq = dx * dx + dy * dy;
+    if (dSq > maxSq) continue;
+    if (dSq < bestSq || (dSq === bestSq && bestIdx >= 0 && e.id < bestId)) {
+      bestIdx = i;
+      bestSq = dSq;
+      bestId = e.id;
+    }
+  }
+  return bestIdx;
+}
+
+/**
+ * FR-1: nearest living enemy within range. Index form above is what the hot path
+ * uses, since the caller needs to write the damaged enemy back and an id lookup
+ * afterwards would be a second O(n) scan per hit.
+ */
 export function selectTarget(
   from: Vec2,
   range: number,
   enemies: readonly Enemy[],
 ): Enemy | null {
-  const maxSq = range * range + RANGE_EPSILON;
-  let best: Enemy | null = null;
-  let bestSq = Infinity;
-  for (const e of enemies) {
-    if (e.hp <= 0) continue; // AC-1.3
-    const dSq = distanceSq(from, e.pos);
-    if (dSq > maxSq) continue;
-    if (dSq < bestSq || (dSq === bestSq && best !== null && e.id < best.id)) {
-      best = e;
-      bestSq = dSq;
-    }
-  }
-  return best;
+  const idx = selectTargetIndex(from, range, enemies);
+  return idx < 0 ? null : enemies[idx]!;
 }
 
 /** AC-28.3: collapse a heading onto the 8 directions a keyboard can express. */

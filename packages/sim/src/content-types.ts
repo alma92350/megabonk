@@ -55,6 +55,22 @@ export interface ItemDef {
   readonly grants?: string;
 }
 
+export interface ShrineDef {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string;
+  /** Gold cost to activate. */
+  readonly cost: number;
+  readonly durationSeconds: number;
+  readonly mods: readonly ModSpec[];
+  /**
+   * When true, re-activating adds a second instance. Otherwise re-activating
+   * refreshes the existing one (AC-14.2) — stacking a timed buff by walking back
+   * and forth is the exploit this flag exists to make deliberate.
+   */
+  readonly stackable?: boolean;
+}
+
 export interface EnemyDef {
   readonly id: string;
   readonly name: string;
@@ -88,6 +104,9 @@ export interface BiomeDef {
   readonly waves: readonly WavePhase[];
   readonly bosses: readonly BossSpawn[];
   readonly merchantAtSeconds: readonly number[];
+  /** Interactables scattered at mapgen. Optional so existing biomes stay valid. */
+  readonly chestCount?: number;
+  readonly shrineCount?: number;
   readonly palette: BiomePalette;
 }
 
@@ -115,6 +134,8 @@ export interface ContentBundle {
   readonly enemies: Readonly<Record<string, EnemyDef>>;
   readonly biomes: Readonly<Record<string, BiomeDef>>;
   readonly characters: Readonly<Record<string, CharacterDef>>;
+  /** Optional: a biome with shrineCount > 0 needs at least one of these. */
+  readonly shrines?: Readonly<Record<string, ShrineDef>>;
 }
 
 /** Permanent meta-unlocks (FR-16) applied at run start. */

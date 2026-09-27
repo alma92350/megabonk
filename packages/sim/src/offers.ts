@@ -73,6 +73,8 @@ export function buildOffer(
   content: ContentBundle,
   weaponSlots: number,
   rngIn: RngState,
+  /** Added to Luck for this roll only. Chests are more generous than level-ups. */
+  luckBonus = 0,
 ): { options: OfferOption[]; rng: RngState } {
   let rng = rngIn;
   const pool = eligibleOptions(state, content, weaponSlots);
@@ -81,7 +83,7 @@ export function buildOffer(
 
   const options: OfferOption[] = [];
   for (const cand of picked.value.slice(0, OPTIONS_PER_OFFER)) {
-    const roll = rollRarity(rng, state.player.stats.luck);
+    const roll = rollRarity(rng, state.player.stats.luck + luckBonus);
     rng = roll.state;
     options.push({
       kind: cand.kind,

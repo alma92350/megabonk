@@ -3,7 +3,7 @@
 import { BASE_STATS, resolveStats, type Modifier, type Stats } from './stats.js';
 import { RARITY_MULTIPLIER, type Rarity } from './progression.js';
 import type { ContentBundle, ModSpec } from './content-types.js';
-import type { HeldItem } from './types.js';
+import type { ActiveBuff, HeldItem } from './types.js';
 
 function modsFrom(source: string, specs: readonly ModSpec[], scale: number): Modifier[] {
   return specs.map((m, i) => ({
@@ -36,6 +36,8 @@ export interface BuildInput {
   /** Tome id → stacks. */
   readonly tomes: Readonly<Record<string, number>>;
   readonly bonusLuck: number;
+  /** Timed shrine buffs. Contribute like any other modifier, then simply vanish. */
+  readonly buffs?: readonly ActiveBuff[];
 }
 
 /** Collect every modifier the build contributes, in a stable, id-tagged form. */
@@ -63,6 +65,12 @@ export function collectModifiers(input: BuildInput, content: ContentBundle): Mod
     for (let s = 0; s < held.stacks; s++) {
       mods.push(...modsFrom(`item:${held.id}:${held.rarity}:${s}`, def.mods, scale));
     }
+  }
+
+  // Buffs are sorted by id so their modifier ids stay stable regardless of the
+  // order the player happened to collect them in.
+  for (const buff of (input.buffs ?? []).slice().sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))) {
+    mods.push(...modsFrom(`buff:${buff.id}:${buff.expiresAtTick}`, buff.mods, 1));
   }
 
   if (input.bonusLuck > 0) {

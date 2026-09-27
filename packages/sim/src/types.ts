@@ -1,6 +1,7 @@
 /** Shared data types. Everything here must be JSON-serialisable (ARCH-1). */
 
 import type { Modifier, Stats } from './stats.js';
+import type { ModSpec } from './content-types.js';
 import type { Rarity } from './progression.js';
 import type { RngState } from './rng.js';
 
@@ -55,6 +56,24 @@ export interface HeldItem {
   readonly stacks: number;
 }
 
+/** A timed buff from a shrine. Expiry is a TICK, never a wall-clock time (AC-14.1). */
+export interface ActiveBuff {
+  readonly id: string;
+  readonly expiresAtTick: number;
+  readonly mods: readonly ModSpec[];
+}
+
+export type InteractableKind = 'chest' | 'shrine';
+
+export interface Interactable {
+  readonly id: EntityId;
+  readonly kind: InteractableKind;
+  readonly pos: Vec2;
+  readonly used: boolean;
+  /** Which shrine this is; absent for chests. */
+  readonly shrineId?: string;
+}
+
 export interface PlayerState {
   readonly pos: Vec2;
   readonly hp: number;
@@ -71,6 +90,7 @@ export interface PlayerState {
   /** Resolved stats, recomputed whenever the modifier set changes. */
   readonly stats: Stats;
   readonly modifiers: readonly Modifier[];
+  readonly buffs: readonly ActiveBuff[];
 }
 
 export interface OfferOption {
@@ -85,6 +105,8 @@ export interface OfferOption {
 
 export interface Offer {
   readonly options: readonly OfferOption[];
+  /** Where the offer came from. Chests roll better rarities than level-ups. */
+  readonly source: 'level' | 'chest';
   /** Tick the offer opened — the agent decision floor is measured from this (AC-28.4). */
   readonly openedTick: number;
   readonly rerollsUsed: number;
@@ -129,10 +151,13 @@ export interface GameState {
   readonly player: PlayerState;
   readonly enemies: readonly Enemy[];
   readonly pickups: readonly Pickup[];
+  readonly interactables: readonly Interactable[];
   readonly map: MapState;
   readonly offer: Offer | null;
   /** Level-ups awaiting an offer screen (AC-2.2). */
   readonly queuedOffers: number;
+  /** Chest pickups awaiting an offer screen; drawn with a rarity bonus. */
+  readonly queuedChestOffers: number;
   readonly nextId: EntityId;
   readonly kills: number;
   readonly bossKills: number;

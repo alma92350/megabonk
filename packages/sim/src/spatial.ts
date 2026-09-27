@@ -30,19 +30,30 @@ export class SpatialGrid<T extends { readonly pos: Vec2 }> {
     else this.cells.set(k, [item]);
   }
 
-  /** Everything in the 3×3 cell block around a point. Callers still filter by distance. */
-  near(pos: Vec2): T[] {
-    const out: T[] = [];
+  /**
+   * Visit everything in the 3×3 cell block around a point.
+   *
+   * Callback rather than a returned array on purpose: at the 2000-entity cap this
+   * runs 2000 times per tick, and allocating (plus spreading into) one array per
+   * call cost ~4 ms of the tick budget on its own. Callers still filter by
+   * distance — cell membership is only a cheap pre-filter.
+   */
+  forEachNear(pos: Vec2, visit: (item: T) => void): void {
     const cx = Math.floor(pos.x / this.cellSize);
     const cy = Math.floor(pos.y / this.cellSize);
     for (let dx = -1; dx <= 1; dx++) {
       for (let dy = -1; dy <= 1; dy++) {
-        const bucket = this.cells.get(
-          (cx + dx + 32768) * 65536 + (cy + dy + 32768),
-        );
-        if (bucket) out.push(...bucket);
+        const bucket = this.cells.get((cx + dx + 32768) * 65536 + (cy + dy + 32768));
+        if (bucket === undefined) continue;
+        for (let i = 0; i < bucket.length; i++) visit(bucket[i]!);
       }
     }
+  }
+
+  /** Array-returning form. Convenient for tests and cold paths; do not use per-entity. */
+  near(pos: Vec2): T[] {
+    const out: T[] = [];
+    this.forEachNear(pos, (item) => out.push(item));
     return out;
   }
 

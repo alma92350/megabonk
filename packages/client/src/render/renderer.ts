@@ -82,7 +82,14 @@ export function drawFrame(ctx: Ctx2D, client: GameClient, nowMs = frameClock + 1
 
   if (state.phase === 'offer' && state.offer !== null) {
     drawOffer(ctx, client, state, hud);
-  } else if (client.screen === 'summary') {
+  } else if (getAdvice() !== null) {
+    // A live advisor is most useful DURING play, not only on the upgrade screen:
+    // that is where positioning advice can still be acted on. Absent entirely
+    // when no advice is set, so an unattached game is pixel-identical (AC-21.1).
+    drawAdvisorPanel(ctx, view, getAdvice()!);
+  }
+
+  if (client.screen === 'summary') {
     drawSummary(ctx, client);
   } else if (client.paused) {
     drawPause(ctx, view);

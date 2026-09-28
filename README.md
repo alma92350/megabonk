@@ -24,6 +24,8 @@ npm run ci                    # purity check + typecheck + tests (what CI runs)
 npm run coverage              # coverage against the thresholds in vitest.config.ts
 npm run mcp                   # the MCP server, over stdio
 npm run agent:auto -- --seed=1 # a full headless run driven by an agent policy
+npm run agent:live             # attach an agent to the game in your browser
+npm run bridge                 # the co-play bridge on its own
 npm run bench                 # performance budgets
 ```
 
@@ -36,6 +38,7 @@ packages/
   meta/       silver, unlocks, quests, save-file handling
   client/     canvas renderer, HUD, screens, input
   mcp/        MCP server and the agent perception/actuation handicap
+  bridge/     the loopback co-play bridge between the page and an agent
   harness/    headless driver, determinism sweep, golden runs, benchmarks
   balance/    balance analysis tooling and design tests
 ```
@@ -73,6 +76,28 @@ Two details worth knowing before you read the code:
   applied in a canonical modifier order. The canonical order is not fussiness —
   IEEE-754 addition is not associative, so permutation-independence cannot be met
   by iterating the caller's array however the arithmetic is written.
+
+### Playing alongside an agent
+
+The agent and the game are separate processes that meet over a tiny loopback
+bridge, so you can hand over as much or as little as you like:
+
+```bash
+npm start                              # terminal 1: the game
+npm run agent:live                     # terminal 2: an advisor
+npm run agent:live -- --autonomous     # ...or let it play
+```
+
+Advisor mode posts a recommendation to a panel on your screen and never touches
+the controls. Autonomous mode drives, but your keys always win: press a movement
+key and you have it back that frame. The bridge is entirely optional — with
+nothing listening, every poll fails quietly and the game is exactly the game it
+was, which is asserted rather than assumed.
+
+The page publishes its state RAW and the handicap is applied on the way out to
+the agent, in `packages/mcp`. That is deliberate: filtering at the source would
+let the client decide what an agent may see, and would make the unrestricted
+debug profile impossible.
 
 ### The agent handicap
 

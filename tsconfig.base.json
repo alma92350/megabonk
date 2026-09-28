@@ -16,7 +16,9 @@
       "@megabonk/sim": ["./packages/sim/src/index.ts"],
       "@megabonk/content": ["./packages/content/src/index.ts"],
       "@megabonk/mcp": ["./packages/mcp/src/index.ts"],
-      "@megabonk/meta": ["./packages/meta/src/index.ts"]
+      "@megabonk/meta": ["./packages/meta/src/index.ts"],
+      "@megabonk/bridge": ["./packages/bridge/src/index.ts"],
+      "@megabonk/bridge/server": ["./packages/bridge/src/server.ts"]
     }
   }
 }

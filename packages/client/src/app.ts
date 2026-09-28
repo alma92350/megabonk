@@ -119,6 +119,15 @@ export class GameClient {
   private readonly seedSource: () => number;
   private acc = 0;
   private banked = false;
+  /**
+   * Agent co-play. `agentControl` is opt-in and human-revocable: the human hands
+   * over movement, and any key press takes it straight back (see onKey). An
+   * agent can always ADVISE without this being on — advice is rendered, never
+   * applied, which is the whole distinction between advisor and autonomous mode.
+   */
+  agentControl = false;
+  agentMove: { x: number; y: number } | null = null;
+
   private pendingChoose: number | null = null;
   private pendingReroll = false;
   private pendingBuy: number | null = null;
@@ -380,7 +389,13 @@ export class GameClient {
   }
 
   private buildInput(firstTickOfFrame: boolean): InputFrame {
-    const move = this.keys.move();
+    // The human's keys always win: if any movement key is held, that is what
+    // happens, whatever the agent last asked for. Handing over control must
+    // never feel like losing the controller.
+    const keyMove = this.keys.move();
+    const human = keyMove.x !== 0 || keyMove.y !== 0;
+    const move =
+      this.agentControl && !human && this.agentMove !== null ? this.agentMove : keyMove;
     if (!firstTickOfFrame) return { move };
 
     const frame: {

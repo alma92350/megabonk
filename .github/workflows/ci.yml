@@ -19,5 +19,7 @@ jobs:
       # failure invalidates every result after it.
       - run: npm run check:purity
       - run: npm run typecheck
+      # CI sets CI=true, which also enables the heavy performance measurements
+      # that are skipped locally to keep `npm test` fast.
       - run: npm test
       - run: npx vite build --config packages/client/vite.config.ts

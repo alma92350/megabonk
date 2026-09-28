@@ -28,6 +28,19 @@ import {
 
 const STRICT = process.env.MEGABONK_PERF === '1';
 
+/**
+ * The two heavy measurements (the 2000-entity p95 sweep and the scaling curve)
+ * cost ~140 s between them and are the only wall-clock assertions in the repo,
+ * which makes them both the slowest part of `npm test` and its only flake
+ * source: one failed on a loaded box and passed on the next run, which is the
+ * worst kind of test — it trains you to re-run rather than to look.
+ *
+ * So they run where a red result means something (CI, or an explicit
+ * MEGABONK_PERF=1 / `npm run bench`) and are skipped in the default local suite,
+ * which keeps the cheap full-run check as the order-of-magnitude guard.
+ */
+const HEAVY = STRICT || process.env.CI === 'true' || process.env.MEGABONK_PERF_HEAVY === '1';
+
 /** 4x the PRD budget on a shared 4-core box; 1x when MEGABONK_PERF=1. */
 const FULL_RUN_CEILING_MS = STRICT ? PRD_FULL_RUN_MS : PRD_FULL_RUN_MS * 4;
 const STEP_P95_CEILING_MS = STRICT ? PRD_STEP_P95_MS : PRD_STEP_P95_MS * 4;
@@ -43,7 +56,7 @@ describe('PRD §2.3 performance budgets', () => {
     expect(m.p50Ms).toBeLessThan(FULL_RUN_CEILING_MS);
   }, 180_000);
 
-  it(`sim step at ${MAX_ENTITIES} live entities stays under the p95 ceiling`, () => {
+  it.skipIf(!HEAVY)(`sim step at ${MAX_ENTITIES} live entities stays under the p95 ceiling`, () => {
     const m = measureStepCost(MAX_ENTITIES, 120);
     console.log(
       `  step @ ${m.entities} entities (${m.aliveEntities} alive): p50 ${m.p50.toFixed(2)} ms, ` +
@@ -55,7 +68,7 @@ describe('PRD §2.3 performance budgets', () => {
     expect(m.p95).toBeLessThan(STEP_P95_CEILING_MS);
   }, 180_000);
 
-  it('per-tick cost grows sub-quadratically with entity count (the spatial grid works)', () => {
+  it.skipIf(!HEAVY)('per-tick cost grows sub-quadratically with entity count (the spatial grid works)', () => {
     // An O(n^2) neighbour query would show a ~4x jump for a 2x population. The
     // grid should keep it near-linear; 3x allows generous slack for cache effects.
     const small = measureStepCost(500, 100);

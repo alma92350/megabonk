@@ -9,6 +9,7 @@ export default defineConfig({
     alias: {
       '@megabonk/sim': resolve(root, 'packages/sim/src/index.ts'),
       '@megabonk/content': resolve(root, 'packages/content/src/index.ts'),
+      '@megabonk/bridge': resolve(root, 'packages/bridge/src/index.ts'),
       '@megabonk/meta': resolve(root, 'packages/meta/src/index.ts'),
     },
   },

@@ -50,13 +50,26 @@ export interface TacticalTuning {
 }
 
 /**
- * Measured over 7 seeds, full 900 s budget, human-parity handicap.
+ * Measured over 16 seeds, full 900 s budget, human-parity handicap. This is the
+ * authoritative comparison; a 7-seed sweep was used for tuning and OVERSTATED
+ * the survival gain badly (it reported 513 s vs 405 s).
  *
- *   baseline (pure flee)     median 405 s, 563 kills,  level 10, 1/7 full runs
- *   tactical, caution 1.9    median 501 s, 2278 kills, level 19, 1/7
- *   tactical, caution 1.0    median 513 s, 2500 kills, level 20, 2/7   <- shipped
+ *              median   mean   reach-10-min   full runs won   kills   level
+ *   baseline    382 s   438 s      19%             1/16         520     9.5
+ *   tactical    440 s   430 s      19%             2/16        1816    16
  *
- * Two findings from the sweep, both the opposite of what I expected:
+ * Read that carefully, because it is not the result the tuning sweep implied:
+ * the tactical policy is far better at PLAYING (3.5x the kills, 1.7x the level)
+ * and barely better at SURVIVING. The median improves 15%, the mean is a wash,
+ * and the rate of reaching ten minutes is identical. It is also higher variance
+ * — its worst seeds (71 s, 122 s) are worse than the baseline's worst (171 s).
+ *
+ * The honest conclusion: engaging converts into levels and kills but does not,
+ * on this content, convert into survival. That points at late-game escalation
+ * rather than at the policy, and it is why the PRD's 80%-reach-10-minutes target
+ * is still unmet by both policies.
+ *
+ * Two findings from the tuning sweep, both the opposite of what I expected:
  *
  *  1. Backing off further makes things monotonically WORSE. danger 3.6 -> 429 s,
  *     4.4 with a wider band -> 249 s. Disengaging means no XP, so the run is lost

@@ -10,3 +10,4 @@ export * from './offers.js';
 export * from './state.js';
 export * from './step.js';
 export * from './summary.js';
+export * from './recording.js';

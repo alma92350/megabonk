@@ -15,3 +15,4 @@ export * from './policy.js';
 export * from './tools.js';
 export { buildServer, parseServerArgs, main } from './server.js';
 export * from './live.js';
+export * from './tactical.js';

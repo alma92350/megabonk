@@ -14,11 +14,13 @@
  */
 
 import {
+  RecordingBuilder,
   TICKS_PER_SECOND,
   TICK_MS,
   createRun,
   step,
   summarise,
+  type Recording,
   type GameState,
   type InputFrame,
   type RunConfig,
@@ -39,6 +41,7 @@ import { KeyTracker, type Action } from './input.js';
 import { planTicks } from './loop.js';
 import { buildHud, type HudModel } from './hud.js';
 import { detectStorage, loadProfile, saveProfile, type StoragePort } from './storage.js';
+import { saveRecording } from './recordings.js';
 import type { Viewport } from './render/projection.js';
 
 export type Screen = 'hub' | 'run' | 'summary';
@@ -125,6 +128,25 @@ export class GameClient {
    * agent can always ADVISE without this being on — advice is rendered, never
    * applied, which is the whole distinction between advisor and autonomous mode.
    */
+  /**
+   * Every run is recorded as seed + input log. It costs a few hundred bytes and
+   * an equality check per tick, and it is the only way to build the corpus of
+   * real human runs that FR-30's parity validation needs (AC-30.1).
+   */
+  private recorder: RecordingBuilder | null = null;
+  lastRecording: Recording | null = null;
+
+  /**
+   * Seal the in-progress run into a recording without ending it.
+   *
+   * Useful for exporting a run you are still playing, and it is what makes the
+   * replay guarantee testable without having to die first.
+   */
+  sealRecording(): Recording | null {
+    if (this.recorder === null || this.state === null) return this.lastRecording;
+    return this.recorder.build(this.state.tick);
+  }
+
   agentControl = false;
   agentMove: { x: number; y: number } | null = null;
 
@@ -172,6 +194,13 @@ export class GameClient {
     this.pendingChoose = null;
     this.pendingReroll = false;
     this.pendingBuy = null;
+    this.recorder = new RecordingBuilder({
+      seed,
+      characterId: this.config.characterId,
+      biomeId: this.config.biomeId,
+      source: 'human',
+    });
+    this.lastRecording = null;
     this.camera = clampCamera(
       createCamera(state.player.pos.x, state.player.pos.y, zoomFor(this.view)),
       state.map.halfExtent,
@@ -355,6 +384,9 @@ export class GameClient {
     for (let i = 0; i < plan.ticks; i++) {
       const before = this.state;
       const input = this.buildInput(i === 0);
+      // Recorded against the tick the input is APPLIED to, which is what replay
+      // reads back; recording after the step would be off by one and diverge.
+      this.recorder?.record(before.tick, input);
       let next: GameState;
       try {
         next = step(before, input, TICK_MS, this.config);
@@ -462,7 +494,22 @@ export class GameClient {
       return;
     }
     this.banked = true;
+    if (this.recorder !== null && this.state !== null) {
+      this.lastRecording = this.recorder.build(this.state.tick);
+      this.recorder = null;
+    }
     const summary = summarise(this.events, null);
+    if (this.lastRecording !== null) {
+      // Kept locally so a player can export a corpus of real runs later; a
+      // storage failure must never disturb the summary screen.
+      saveRecording(this.storage, {
+        recording: this.lastRecording,
+        seconds: summary.seconds,
+        kills: summary.kills,
+        level: summary.level,
+        outcome: summary.outcome,
+      });
+    }
     const before = new Map(this.profile.quests.map((q) => [q.id, q.progress]));
     const after = applyRun(this.profile, summary);
 

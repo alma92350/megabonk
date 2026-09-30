@@ -39,6 +39,10 @@ export interface LiveStatus {
    * backgrounded and the sim clock is not advancing — not a bug, just nothing
    * to act on yet. */
   readonly pageVisible: boolean | null;
+  /** null until the page has ever reported in. 'hub' or 'summary' means the
+   * human is not in a run right now — /state has nothing new to say, and
+   * that is expected, not a fault. */
+  readonly screen: 'hub' | 'run' | 'summary' | null;
 }
 
 /**
@@ -106,9 +110,16 @@ export class LiveAgent {
         stateVersion: health.stateVersion,
         mode: this.mode,
         pageVisible: health.pageVisible ?? null,
+        screen: health.screen ?? null,
       };
     } catch {
-      return { clientConnected: false, stateVersion: 0, mode: this.mode, pageVisible: null };
+      return {
+        clientConnected: false,
+        stateVersion: 0,
+        mode: this.mode,
+        pageVisible: null,
+        screen: null,
+      };
     }
   }
 

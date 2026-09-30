@@ -28,6 +28,13 @@ import { setAdvice } from './advice.js';
 export interface CoPlayHost {
   /** The live state, or null when no run is in progress. */
   getState(): unknown | null;
+  /**
+   * Which screen the human is looking at right now. Published on every poll
+   * regardless of `getState()`, so a reader can tell "back at the hub" or "on
+   * the run summary" apart from "state frozen, something's wrong" — `/state`
+   * alone goes silent the moment the human leaves a run.
+   */
+  getScreen?(): 'hub' | 'run' | 'summary';
   applyAdvice?(advice: AdvicePayload | null): void;
   applyIntent?(intent: IntentPayload): void;
 }
@@ -60,6 +67,8 @@ export class CoPlay {
       if (state !== null && state !== undefined) {
         await this.api.publishState(state);
       }
+      const screen = this.host.getScreen?.();
+      if (screen !== undefined) await this.api.publishScreen(screen);
 
       const advice = await this.api.readAdvice();
       if (advice.version !== this.lastAdviceVersion) {

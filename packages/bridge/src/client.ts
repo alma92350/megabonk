@@ -56,6 +56,7 @@ export interface BridgeApi {
     clientConnected: boolean;
     stateVersion: number;
     pageVisible?: boolean | null;
+    screen?: 'hub' | 'run' | 'summary' | null;
   }>;
   publishState(snapshot: unknown): Promise<void>;
   readState<T = unknown>(): Promise<BridgeDoc<T>>;
@@ -68,6 +69,11 @@ export interface BridgeApi {
    * page. */
   publishVisibility(visible: boolean): Promise<void>;
   readVisibility(): Promise<BridgeDoc<boolean>>;
+  /** Which screen the client is on, published every poll regardless of run
+   * state — so an attached reader can tell "back at the hub" or "on the
+   * summary screen" apart from "state frozen, something's wrong." */
+  publishScreen(screen: 'hub' | 'run' | 'summary'): Promise<void>;
+  readScreen(): Promise<BridgeDoc<'hub' | 'run' | 'summary'>>;
 }
 
 export function bridgeApi(base: string = bridgeUrl()): BridgeApi {
@@ -81,6 +87,7 @@ export function bridgeApi(base: string = bridgeUrl()): BridgeApi {
         clientConnected: boolean;
         stateVersion: number;
         pageVisible?: boolean | null;
+        screen?: 'hub' | 'run' | 'summary' | null;
       };
     },
     publishState: (snapshot) => postDoc(`${base}/state`, 'snapshot', snapshot),
@@ -91,5 +98,7 @@ export function bridgeApi(base: string = bridgeUrl()): BridgeApi {
     readIntent: () => getDoc<IntentPayload>(`${base}/intent`, 'intent'),
     publishVisibility: (visible) => postDoc(`${base}/visibility`, 'visible', visible),
     readVisibility: () => getDoc<boolean>(`${base}/visibility`, 'visible'),
+    publishScreen: (screen) => postDoc(`${base}/screen`, 'screen', screen),
+    readScreen: () => getDoc<'hub' | 'run' | 'summary'>(`${base}/screen`, 'screen'),
   };
 }

@@ -30,11 +30,26 @@
         color: #8fa598;
       }
       noscript { color: #ff9166; }
+      #coplayToggle {
+        position: fixed;
+        right: 16px;
+        bottom: 16px;
+        display: none;
+        padding: 8px 14px;
+        font: 13px/1.4 "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+        color: #eaf2ea;
+        background: rgba(10, 20, 16, 0.72);
+        border: 1px solid #3a5a48;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      #coplayToggle:hover { background: rgba(20, 40, 32, 0.85); }
     </style>
   </head>
   <body>
     <canvas id="stage" aria-label="Hollowlight game view" role="img"></canvas>
     <div id="boot">Loading Verdant Hollow…</div>
+    <button id="coplayToggle" type="button"></button>
     <noscript>Hollowlight needs JavaScript to run.</noscript>
     <script type="module" src="/src/main.ts"></script>
   </body>

@@ -15,6 +15,8 @@ function fakeApi(over: Partial<BridgeApi> = {}): BridgeApi {
     readIntent: async () => ({ value: null, version: 0 }),
     publishVisibility: async () => {},
     readVisibility: async () => ({ value: null, version: 0 }),
+    publishScreen: async () => {},
+    readScreen: async () => ({ value: null, version: 0 }),
     ...over,
   };
 }
@@ -45,6 +47,16 @@ describe('co-play bridge client', () => {
     });
     await co.poll();
     expect(published).toHaveLength(0);
+  });
+
+  it('publishes the screen on every poll, even with no run in progress', async () => {
+    const screens: string[] = [];
+    const co = new CoPlay(
+      fakeApi({ publishScreen: async (s) => void screens.push(s) }),
+      { getState: () => null, getScreen: () => 'hub' },
+    );
+    await co.poll();
+    expect(screens).toEqual(['hub']);
   });
 
   it('applies advice from the agent exactly once per version change', async () => {

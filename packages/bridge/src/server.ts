@@ -88,6 +88,11 @@ export async function startBridge(options: BridgeOptions = {}): Promise<BridgeHa
   // agent cannot tell "nothing to do, the human tabbed away" from "something
   // is broken." The client posts document.visibilityState here on change.
   const visibility = empty<unknown>();
+  // `/state` only ever carries a GameState, and the client only publishes one
+  // while screen === 'run' — so leaving a run (back to the hub, or onto the
+  // summary screen) makes `/state` go silent, indistinguishable to a reader
+  // from a stuck page. This is published on every poll regardless of screen.
+  const screen = empty<unknown>();
 
   const server = createServer((req, res) => {
     void handle(req, res);
@@ -118,6 +123,10 @@ export async function startBridge(options: BridgeOptions = {}): Promise<BridgeHa
         intentVersion: intent.version,
         // null until the page has ever reported in; true/false once it has.
         pageVisible: visibility.value,
+        // null until the page has ever reported in; 'hub' | 'run' | 'summary'
+        // once it has. The one field that tells a reader "nothing published
+        // to /state" apart from "not in a run right now."
+        screen: screen.value,
       });
       return;
     }
@@ -131,7 +140,9 @@ export async function startBridge(options: BridgeOptions = {}): Promise<BridgeHa
             ? intent
             : url === '/visibility'
               ? visibility
-              : null;
+              : url === '/screen'
+                ? screen
+                : null;
     if (slot === null) {
       send(res, 404, { error: `unknown path ${url}` });
       return;
@@ -143,7 +154,9 @@ export async function startBridge(options: BridgeOptions = {}): Promise<BridgeHa
           ? 'advice'
           : url === '/visibility'
             ? 'visible'
-            : 'intent';
+            : url === '/screen'
+              ? 'screen'
+              : 'intent';
 
     if (req.method === 'GET') {
       send(res, 200, { [key]: slot.value, version: slot.version, updatedAt: slot.updatedAt });

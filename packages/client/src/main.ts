@@ -61,6 +61,7 @@ function start(): void {
     const api = bridgeApi(`http://127.0.0.1:${port}`);
     const coplay = new CoPlay(api, {
       getState: () => (client.screen === 'run' ? client.state : null),
+      getScreen: () => client.screen,
       applyIntent: (intent) => client.applyCoPlayIntent(intent),
     });
     coplay.start();
@@ -78,7 +79,32 @@ function start(): void {
   // Exposed for diagnostics and end-to-end tests: read-only access to the live
   // client. Not a control surface — agents go through the bridge.
   (window as unknown as Record<string, unknown>).__megabonkClient = client;
-  {
+
+  // A one-click way to turn co-play on from the hub, for anyone who does not
+  // know the `?bridge` URL trick. Toggling reloads the page: the bridge param
+  // is only ever read once at startup, so there is no in-place "start" path.
+  const coplayToggle = document.getElementById('coplayToggle') as HTMLButtonElement | null;
+  let syncCoplayToggle: (() => void) | null = null;
+  if (coplayToggle !== null) {
+    const bridgeActive = bridgeParam !== null && bridgeParam !== 'off';
+    coplayToggle.textContent = bridgeActive ? 'Co-play: on' : 'Enable co-play';
+    coplayToggle.title = bridgeActive
+      ? 'Reload with co-play off'
+      : 'Reload with the bridge enabled on the default port';
+    coplayToggle.addEventListener('click', () => {
+      const url = new URL(window.location.href);
+      if (bridgeActive) url.searchParams.delete('bridge');
+      else url.searchParams.set('bridge', '');
+      window.location.href = url.toString();
+    });
+    let toggleShown = false;
+    syncCoplayToggle = () => {
+      const shouldShow = client.screen === 'hub';
+      if (shouldShow === toggleShown) return;
+      toggleShown = shouldShow;
+      coplayToggle.style.display = shouldShow ? 'block' : 'none';
+    };
+    syncCoplayToggle();
   }
 
   // Render at device resolution, lay out in CSS pixels.
@@ -115,6 +141,7 @@ function start(): void {
     last = now;
     try {
       client.advance(dt);
+      syncCoplayToggle?.();
       ctx.save();
       ctx.scale(dpr, dpr);
       drawFrame(ctx, client, now);

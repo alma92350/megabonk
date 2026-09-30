@@ -139,6 +139,18 @@ describe('the co-play bridge', () => {
     expect((await (await fetch(`${url}/health`)).json()).pageVisible).toBe(true);
   });
 
+  it('reports the client screen so a reader can tell "not in a run" from "stuck"', async () => {
+    const { url } = await boot();
+    expect((await (await fetch(`${url}/health`)).json()).screen).toBeNull();
+
+    await post(url, '/screen', { screen: 'hub' });
+    expect((await (await fetch(`${url}/health`)).json()).screen).toBe('hub');
+    expect((await (await fetch(`${url}/screen`)).json()).screen).toBe('hub');
+
+    await post(url, '/screen', { screen: 'run' });
+    expect((await (await fetch(`${url}/health`)).json()).screen).toBe('run');
+  });
+
   it('close() releases the port so a restart is immediate', async () => {
     const h = await startBridge({ port: 0 });
     const port = h.port;

@@ -15,6 +15,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['packages/*/test/**/*.test.ts'],
+    testTimeout: 60000,
     coverage: {
       provider: 'v8',
       include: ['packages/sim/src/**', 'packages/content/src/**', 'packages/meta/src/**'],

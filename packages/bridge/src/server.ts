@@ -81,6 +81,13 @@ export async function startBridge(options: BridgeOptions = {}): Promise<BridgeHa
   const state = empty<unknown>();
   const advice = empty<unknown>();
   const intent = empty<unknown>();
+  // FR-21 follow-up: the sim clock only advances via the page's rAF loop, which
+  // browsers throttle hard once a tab is backgrounded. Without this, a frozen
+  // `/state` (tick not moving, version still climbing from the 100ms poll) is
+  // indistinguishable from a genuinely stuck or crashed page — an attached
+  // agent cannot tell "nothing to do, the human tabbed away" from "something
+  // is broken." The client posts document.visibilityState here on change.
+  const visibility = empty<unknown>();
 
   const server = createServer((req, res) => {
     void handle(req, res);
@@ -109,17 +116,34 @@ export async function startBridge(options: BridgeOptions = {}): Promise<BridgeHa
         stateVersion: state.version,
         adviceVersion: advice.version,
         intentVersion: intent.version,
+        // null until the page has ever reported in; true/false once it has.
+        pageVisible: visibility.value,
       });
       return;
     }
 
     const slot =
-      url === '/state' ? state : url === '/advice' ? advice : url === '/intent' ? intent : null;
+      url === '/state'
+        ? state
+        : url === '/advice'
+          ? advice
+          : url === '/intent'
+            ? intent
+            : url === '/visibility'
+              ? visibility
+              : null;
     if (slot === null) {
       send(res, 404, { error: `unknown path ${url}` });
       return;
     }
-    const key = url === '/state' ? 'snapshot' : url === '/advice' ? 'advice' : 'intent';
+    const key =
+      url === '/state'
+        ? 'snapshot'
+        : url === '/advice'
+          ? 'advice'
+          : url === '/visibility'
+            ? 'visible'
+            : 'intent';
 
     if (req.method === 'GET') {
       send(res, 200, { [key]: slot.value, version: slot.version, updatedAt: slot.updatedAt });

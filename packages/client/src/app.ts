@@ -156,6 +156,34 @@ export class GameClient {
   agentControl = false;
   agentMove: { x: number; y: number } | null = null;
 
+  /**
+   * Apply an intent from the co-play bridge (FR-21).
+   *
+   * Regression guard: this taps a key (down then immediately up) rather than
+   * only pressing it down. `onKey` action dispatch is edge-triggered — a press
+   * with no matching release leaves the code "held", so a second intent with
+   * the SAME chooseIndex (a normal agent pattern: "always take option 3") would
+   * silently no-op because there is no up->down edge left to fire on. This bit
+   * an actual live-play session before the tap was added.
+   */
+  applyCoPlayIntent(intent: {
+    readonly control?: boolean;
+    readonly move?: { readonly x: number; readonly y: number } | null;
+    readonly chooseIndex?: number;
+    readonly reroll?: boolean;
+  }): void {
+    if (intent.control !== undefined) this.agentControl = intent.control;
+    this.agentMove = intent.move ?? null;
+    if (intent.reroll === true) {
+      this.onKey('KeyR', true);
+      this.onKey('KeyR', false);
+    } else if (intent.chooseIndex !== undefined) {
+      const code = `Digit${intent.chooseIndex + 1}`;
+      this.onKey(code, true);
+      this.onKey(code, false);
+    }
+  }
+
   private pendingChoose: number | null = null;
   private pendingReroll = false;
   private pendingBuy: number | null = null;

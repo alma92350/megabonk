@@ -51,13 +51,23 @@ async function postDoc(url: string, key: string, value: unknown): Promise<void> 
 
 export interface BridgeApi {
   readonly base: string;
-  health(): Promise<{ ok: boolean; clientConnected: boolean; stateVersion: number }>;
+  health(): Promise<{
+    ok: boolean;
+    clientConnected: boolean;
+    stateVersion: number;
+    pageVisible?: boolean | null;
+  }>;
   publishState(snapshot: unknown): Promise<void>;
   readState<T = unknown>(): Promise<BridgeDoc<T>>;
   publishAdvice(advice: AdvicePayload | null): Promise<void>;
   readAdvice(): Promise<BridgeDoc<AdvicePayload>>;
   publishIntent(intent: IntentPayload | null): Promise<void>;
   readIntent(): Promise<BridgeDoc<IntentPayload>>;
+  /** document.visibilityState === 'visible', so an attached agent can tell a
+   * frozen `/state` (tab backgrounded, rAF throttled) from a genuinely stuck
+   * page. */
+  publishVisibility(visible: boolean): Promise<void>;
+  readVisibility(): Promise<BridgeDoc<boolean>>;
 }
 
 export function bridgeApi(base: string = bridgeUrl()): BridgeApi {
@@ -66,7 +76,12 @@ export function bridgeApi(base: string = bridgeUrl()): BridgeApi {
     async health() {
       const res = await fetch(`${base}/health`, { cache: 'no-store' });
       if (!res.ok) throw new Error(`bridge health -> ${res.status}`);
-      return (await res.json()) as { ok: boolean; clientConnected: boolean; stateVersion: number };
+      return (await res.json()) as {
+        ok: boolean;
+        clientConnected: boolean;
+        stateVersion: number;
+        pageVisible?: boolean | null;
+      };
     },
     publishState: (snapshot) => postDoc(`${base}/state`, 'snapshot', snapshot),
     readState: <T,>() => getDoc<T>(`${base}/state`, 'snapshot'),
@@ -74,5 +89,7 @@ export function bridgeApi(base: string = bridgeUrl()): BridgeApi {
     readAdvice: () => getDoc<AdvicePayload>(`${base}/advice`, 'advice'),
     publishIntent: (intent) => postDoc(`${base}/intent`, 'intent', intent),
     readIntent: () => getDoc<IntentPayload>(`${base}/intent`, 'intent'),
+    publishVisibility: (visible) => postDoc(`${base}/visibility`, 'visible', visible),
+    readVisibility: () => getDoc<boolean>(`${base}/visibility`, 'visible'),
   };
 }

@@ -35,6 +35,10 @@ export interface LiveStatus {
   readonly clientConnected: boolean;
   readonly stateVersion: number;
   readonly mode: LiveMode;
+  /** null until the page has ever reported in; false means the tab is
+   * backgrounded and the sim clock is not advancing — not a bug, just nothing
+   * to act on yet. */
+  readonly pageVisible: boolean | null;
 }
 
 /**
@@ -101,9 +105,10 @@ export class LiveAgent {
         clientConnected: health.clientConnected,
         stateVersion: health.stateVersion,
         mode: this.mode,
+        pageVisible: health.pageVisible ?? null,
       };
     } catch {
-      return { clientConnected: false, stateVersion: 0, mode: this.mode };
+      return { clientConnected: false, stateVersion: 0, mode: this.mode, pageVisible: null };
     }
   }
 

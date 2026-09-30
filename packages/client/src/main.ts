@@ -58,19 +58,22 @@ function start(): void {
   if (bridgeParam !== null && bridgeParam !== 'off') {
     const asPort = Number(bridgeParam);
     const port = asPort >= 1024 && asPort <= 65535 ? asPort : DEFAULT_BRIDGE_PORT;
-    const coplay = new CoPlay(bridgeApi(`http://127.0.0.1:${port}`), {
+    const api = bridgeApi(`http://127.0.0.1:${port}`);
+    const coplay = new CoPlay(api, {
       getState: () => (client.screen === 'run' ? client.state : null),
-      applyIntent: (intent) => {
-        if (intent.control !== undefined) client.agentControl = intent.control;
-        client.agentMove = intent.move ?? null;
-        if (intent.reroll === true) client.onKey('KeyR', true);
-        else if (intent.chooseIndex !== undefined) {
-          client.onKey(`Digit${intent.chooseIndex + 1}`, true);
-        }
-      },
+      applyIntent: (intent) => client.applyCoPlayIntent(intent),
     });
     coplay.start();
     (window as unknown as Record<string, unknown>).__megabonkCoPlay = coplay;
+
+    // The sim clock only advances via this file's rAF loop, which browsers
+    // throttle hard once the tab is backgrounded. Report visibility so an
+    // attached agent can tell "tabbed away, nothing to do" apart from "stuck."
+    const reportVisibility = (): void => {
+      void api.publishVisibility(document.visibilityState === 'visible');
+    };
+    document.addEventListener('visibilitychange', reportVisibility);
+    reportVisibility();
   }
   // Exposed for diagnostics and end-to-end tests: read-only access to the live
   // client. Not a control surface — agents go through the bridge.

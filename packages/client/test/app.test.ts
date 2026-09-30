@@ -240,6 +240,25 @@ describe('offer phase (FR-19 / AC-19.2)', () => {
     expect(c.state.offer!.rerollsUsed).toBe(1);
     expect(c.state.player.rerolls).toBe(0);
   });
+
+  it('applyCoPlayIntent resolves the SAME option index across two different offers (regression)', () => {
+    // A live co-play session hit this: the bridge intent handler pressed a
+    // digit key but never released it, so picking option index 2 twice in a
+    // row across two separate offers silently no-op'd the second time (no
+    // up->down edge left to fire on). applyCoPlayIntent taps instead of holds.
+    const c = client();
+    c.startRun();
+    c.state = offerState(c.state!);
+    c.applyCoPlayIntent({ control: true, chooseIndex: 2 });
+    c.advance(TICK_MS);
+    expect(c.state.phase).toBe('playing');
+    expect(c.state.player.gold).toBeGreaterThan(0);
+
+    c.state = offerState(c.state!);
+    c.applyCoPlayIntent({ control: true, chooseIndex: 2 });
+    c.advance(TICK_MS);
+    expect(c.state.phase).toBe('playing');
+  });
 });
 
 describe('AC-21.1 / AC-21.2 the advisor never touches the sim', () => {

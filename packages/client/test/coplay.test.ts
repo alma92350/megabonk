@@ -13,6 +13,8 @@ function fakeApi(over: Partial<BridgeApi> = {}): BridgeApi {
     readAdvice: async () => ({ value: null, version: 0 }),
     publishIntent: async () => {},
     readIntent: async () => ({ value: null, version: 0 }),
+    publishVisibility: async () => {},
+    readVisibility: async () => ({ value: null, version: 0 }),
     ...over,
   };
 }

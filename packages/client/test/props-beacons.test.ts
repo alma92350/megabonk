@@ -21,6 +21,8 @@ describe('reward beacons', () => {
   it('does not draw a beacon for something already on screen', () => {
     const out: Placement = { x: 0, y: 0, angle: 0 };
     expect(beaconPlacement(600, 380, view, BEACON_INSET, BEACON_INSET_Y, out)).toBe(false);
+    // Just past the edge, its sprite is still partly visible: no beacon yet.
+    expect(beaconPlacement(view.width + 30, 400, view, BEACON_INSET, BEACON_INSET_Y, out)).toBe(false);
     expect(beaconPlacement(640, 400, { width: 40, height: 40 }, BEACON_INSET, BEACON_INSET_Y, out)).toBe(false);
   });
 

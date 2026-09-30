@@ -264,7 +264,7 @@ function drawShadows(ctx: Ctx2D, frame: WorldFrame, buffer: SpriteBuffer): void 
       radius = (e?.radius ?? 0.5) * enemyVisual(e?.kind ?? '').scale * 0.9;
     } else if (s.kind === 'merchant') radius = 1.1;
     else if (s.kind === 'projectile') radius = 0.22;
-    else if (s.kind === 'interactable') radius = 0.8;
+    else if (s.kind === 'interactable') radius = 1.0;
     else radius = 0.6;
     pathContactShadow(ctx, projectX(s.wx, cam, view), projectY(s.wy, 0, cam, view), radius * cam.zoom);
   }

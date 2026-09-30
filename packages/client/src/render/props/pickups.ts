@@ -171,7 +171,7 @@ const PROPS: Readonly<Record<string, readonly Prop[]>> = (() => {
       const hr = HALO_R[tier] ?? HALO_R[0];
       const size = Math.max(box.w, box.h, hr * 2);
       list.push(new Prop(pickupSpriteKey(kind, tier), size, size, (c) => {
-        paintHalo(c, v.glow, hr, 0.62);
+        paintHalo(c, v.glow, hr, 0.8);
         paintBody(c, v, tier);
       }, undefined, PICKUP_SCALE));
     }
@@ -203,7 +203,7 @@ export function drawPickupProp(
   // Contact shadow shrinks as the pickup rises on its bob. Tiny gems skip it:
   // their halo already grounds them and it is a blit per pickup.
   if (v.kind !== 'xp' || tier >= 2) SHADOW.draw(ctx, cache, zoom, x, groundY, 0.5 - (z - FLOAT_Z) * 0.6, pop, pop);
-  prop.draw(ctx, cache, zoom, x, y, 0.78 + 0.22 * pulse, pop, pop);
+  prop.draw(ctx, cache, zoom, x, y, 0.88 + 0.12 * pulse, pop, pop);
 
   const tw = twinkle(time, p.id, reduce);
   if (tw > 0.04) {

@@ -17,8 +17,9 @@ import { CHEST_GLOW, INK, MERCHANT_GLOW, shrineTint } from './palette.js';
 
 export const BEACON_INSET = 36;
 /** Top and bottom keep clear of the HP bar, timer and hotbar. */
-export const BEACON_INSET_Y = 66;
+export const BEACON_INSET_Y = 82;
 export const BEACON_RANGE = 95;
+const HIDE_MARGIN = 60;
 
 export interface Placement {
   x: number;
@@ -38,7 +39,8 @@ export function beaconPlacement(
   const dx = sx - cx, dy = sy - cy;
   const hw = cx - insetX, hh = cy - insetY;
   if (hw <= 0 || hh <= 0) return false;
-  if (Math.abs(dx) <= hw && Math.abs(dy) <= hh) return false;
+  // Hide only when the object itself is (nearly) on screen; sprites reach ~60px above their base.
+  if (Math.abs(dx) <= cx + HIDE_MARGIN && Math.abs(dy) <= cy + HIDE_MARGIN) return false;
   const t = Math.min(hw / (Math.abs(dx) || 1e-9), hh / (Math.abs(dy) || 1e-9));
   out.x = cx + dx * t;
   out.y = cy + dy * t;

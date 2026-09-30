@@ -116,6 +116,20 @@ describe('run recording', () => {
     expect(parseRecording(JSON.stringify(rec)).recording).toEqual(rec);
   });
 
+  it('carries meta-unlocks and difficulty, so a replay starts from the same state', () => {
+    const unlocks = { extraRerolls: 2, extraWeaponSlots: 1, bonusLuck: 0.2 };
+    const b = new RecordingBuilder({
+      seed: 5, characterId: 'tester', biomeId: 'testfield', unlocks, difficulty: 1.5,
+    });
+    b.record(0, { move: { x: 1, y: 0 } });
+    const rec = b.build(120);
+    expect(parseRecording(JSON.stringify(rec)).recording).toEqual(rec);
+    const cfg = config({ seed: 5, unlocks, difficulty: 1.5 });
+    const plain = replay(config({ seed: 5 }), rec).state;
+    expect(replay(config({ seed: 5 }), rec).state).toEqual(replay(cfg, rec).state);
+    expect(plain.tick).toBeGreaterThan(0);
+  });
+
   it('rejects a recording from a different format version rather than misreplaying it', () => {
     const b = new RecordingBuilder({ seed: 5, characterId: 'tester', biomeId: 'testfield' });
     const rec = { ...b.build(10), version: RECORDING_VERSION + 99 };

@@ -209,6 +209,8 @@ export class GameClient {
       seed,
       characterId: this.config.characterId,
       biomeId: this.config.biomeId,
+      ...(this.config.unlocks !== undefined ? { unlocks: this.config.unlocks } : {}),
+      ...(this.config.difficulty !== undefined ? { difficulty: this.config.difficulty } : {}),
       source: 'human',
     });
     this.lastRecording = null;

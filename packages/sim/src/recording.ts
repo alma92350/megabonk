@@ -20,7 +20,7 @@
 import { createRun } from './state.js';
 import { step } from './step.js';
 import { TICK_MS } from './rules.js';
-import type { RunConfig } from './content-types.js';
+import type { MetaUnlocks, RunConfig } from './content-types.js';
 import type { GameState, InputFrame, SimEvent, Vec2 } from './types.js';
 
 export const RECORDING_VERSION = 1;
@@ -41,6 +41,10 @@ export interface Recording {
   /** Total ticks the run lasted. Replay stops here. */
   readonly ticks: number;
   readonly inputs: readonly RecordedInput[];
+  /** Meta-unlocks the run started with; without them a replay diverges. */
+  readonly unlocks?: MetaUnlocks;
+  /** Difficulty multiplier the run started with. */
+  readonly difficulty?: number;
   /** Optional provenance: who or what produced this run. */
   readonly source?: string;
   readonly label?: string;
@@ -50,6 +54,8 @@ export interface RecordingMeta {
   readonly seed: number;
   readonly characterId: string;
   readonly biomeId: string;
+  readonly unlocks?: MetaUnlocks;
+  readonly difficulty?: number;
   readonly source?: string;
   readonly label?: string;
 }
@@ -99,6 +105,8 @@ export class RecordingBuilder {
       biomeId: this.meta.biomeId,
       ticks,
       inputs: this.inputs.slice(),
+      ...(this.meta.unlocks !== undefined ? { unlocks: this.meta.unlocks } : {}),
+      ...(this.meta.difficulty !== undefined ? { difficulty: this.meta.difficulty } : {}),
       ...(this.meta.source !== undefined ? { source: this.meta.source } : {}),
       ...(this.meta.label !== undefined ? { label: this.meta.label } : {}),
     };
@@ -145,6 +153,8 @@ export function replay(config: RunConfig, recording: Recording): ReplayResult {
     seed: recording.seed,
     characterId: recording.characterId,
     biomeId: recording.biomeId,
+    ...(recording.unlocks !== undefined ? { unlocks: recording.unlocks } : {}),
+    ...(recording.difficulty !== undefined ? { difficulty: recording.difficulty } : {}),
   };
   let state = createRun(cfg);
   const events: SimEvent[] = [...state.events];
@@ -214,6 +224,8 @@ export function parseRecording(raw: string): ParsedRecording {
       biomeId: r.biomeId,
       ticks: r.ticks as number,
       inputs,
+      ...(typeof r.unlocks === 'object' && r.unlocks !== null ? { unlocks: r.unlocks } : {}),
+      ...(Number.isFinite(r.difficulty) ? { difficulty: r.difficulty as number } : {}),
       ...(typeof r.source === 'string' ? { source: r.source } : {}),
       ...(typeof r.label === 'string' ? { label: r.label } : {}),
     },

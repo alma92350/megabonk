@@ -54,6 +54,7 @@ export class FakeCtx {
   fillText(t: string): void { this.hit('fillText'); this.texts.push(String(t)); }
   strokeText(t: string): void { this.hit('strokeText'); this.texts.push(String(t)); }
   measureText(t: string): { width: number } { this.hit('measureText'); return { width: String(t).length * 6 }; }
+  drawImage(): void { this.hit('drawImage'); }
   createLinearGradient(): GradientLike { this.hit('createLinearGradient'); return new FakeGradient(); }
   createRadialGradient(): GradientLike { this.hit('createRadialGradient'); return new FakeGradient(); }
 }

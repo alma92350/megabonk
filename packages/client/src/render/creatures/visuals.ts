@@ -39,7 +39,7 @@ export interface EnemyVisual {
 }
 
 /** Enemy shots, and the glowing eyes of the things that fire them. */
-export const RANGED_GLOW = '#ff4f86';
+export const RANGED_GLOW = '#ff5cf0';
 
 function v(
   id: string, shape: EnemyShape, body: string, shade: string, light: string, rim: string,
@@ -50,31 +50,31 @@ function v(
 
 export const ENEMY_VISUALS: Readonly<Record<string, EnemyVisual>> = Object.freeze({
   // fodder swarm: rose-pink goblin
-  grunt: v('grunt', 'goblin', '#ea6a96', '#b53d6b', '#ffa6c2', '#ffc9da', '#8a5a3a', '#3a1424', 1.35, false, 2.5, 130),
+  grunt: v('grunt', 'goblin', '#3b46e3', '#252c93', '#949bf9', '#bdc1ff', '#8a5a3a', '#3a1424', 1.35, false, 2.5, 130),
   // fast chaser: amber fox
-  runner: v('runner', 'fox', '#f28a2e', '#bd5619', '#ffc36b', '#ffdca8', '#fff2dc', '#3a1c0c', 1.5, false, 2.1, 90),
+  runner: v('runner', 'fox', '#e3843b', '#935425', '#f9c094', '#ffd9bd', '#fff2dc', '#3a1c0c', 1.5, false, 2.1, 90),
   // insect swarm: cyan beetle
-  swarmling: v('swarmling', 'bug', '#3ccfe6', '#1c8fad', '#a8f3ff', '#d2fbff', '#e8fdff', '#0c3040', 1.55, false, 2.0, 70),
+  swarmling: v('swarmling', 'bug', '#3bc1e3', '#257d93', '#94e5f9', '#bdf2ff', '#e8fdff', '#0c3040', 1.55, false, 2.0, 70),
   // heavy bruiser: red tusked ogre
-  brute: v('brute', 'ogre', '#d63a35', '#94201f', '#ff7d6c', '#ffb5a6', '#f1e6c8', '#3a0c0c', 1.2, false, 3.0, 190),
+  brute: v('brute', 'ogre', '#e3c13b', '#937d25', '#f9e594', '#fff2bd', '#f1e6c8', '#3a0c0c', 1.2, false, 3.0, 190),
   // fast tough flanker: indigo wolf
-  stalker: v('stalker', 'wolf', '#4f72f0', '#2f45b8', '#a0b8ff', '#ccd4ff', '#e9edff', '#141a55', 1.6, false, 2.0, 100),
+  stalker: v('stalker', 'wolf', '#3be3d5', '#25938a', '#94f9f1', '#bdfff9', '#e9edff', '#141a55', 1.6, false, 2.0, 100),
   // ranged harasser: orchid hooded imp with a raised orb
-  lobber: v('lobber', 'imp', '#dc6ef0', '#9a3fc0', '#f2b8ff', '#f8d8ff', '#ff8ad0', '#2a0c48', 1.3, true, 2.7, 140),
+  lobber: v('lobber', 'imp', '#bc44e4', '#772593', '#e094f9', '#eebdff', '#ffb4ff', '#2a0c48', 1.3, true, 2.7, 140),
   // ranged sniper: tall purple robed one-eyed seer
-  seer: v('seer', 'seer', '#7050e8', '#4530ac', '#b09cff', '#d0c4ff', '#ff8ad0', '#1e0c4a', 1.35, true, 3.6, 170),
+  seer: v('seer', 'seer', '#6f40dd', '#462593', '#b394f9', '#d1bdff', '#ffb4ff', '#1e0c4a', 1.35, true, 3.6, 170),
   // armoured tank: grey stone golem with lava runes
-  tank: v('tank', 'golem', '#a6a6b2', '#646470', '#dedee8', '#f0f0f8', '#ff9a3c', '#2a2838', 1.05, false, 3.4, 220),
+  tank: v('tank', 'golem', '#a6a6b2', '#646470', '#dedee8', '#f0f0f8', '#ff9a3c', '#2a2838', 1.2, false, 2.7, 220),
   // boss: plum armoured guardian with gold antlers
-  warden: v('warden', 'warden', '#a82a86', '#661056', '#e05ec0', '#ff9fe0', '#ffc94a', '#2a0620', 1.0, false, 4.9, 240),
+  warden: v('warden', 'warden', '#ae32a8', '#93258d', '#f994f4', '#ffbdfc', '#ffc94a', '#2a0620', 1.0, false, 4.9, 240),
 });
 
 const FALLBACK_ENEMY: EnemyVisual = Object.freeze(
-  v('generic', 'generic', '#d4507a', '#98285a', '#ff96b4', '#ffc4d4', '#f0e2c0', '#30101e', 1.2, false, 2.4, 140),
+  v('generic', 'generic', '#4b9ad2', '#256593', '#94cff9', '#bde3ff', '#f0e2c0', '#30101e', 1.2, false, 2.4, 140),
 );
 
 const FALLBACK_RANGED: EnemyVisual = Object.freeze(
-  v('genericRanged', 'genericRanged', '#b070f0', '#7a3fb8', '#dcb4ff', '#eed6ff', '#ff8ad0', '#22103e', 1.2, true, 2.6, 140),
+  v('genericRanged', 'genericRanged', '#b070f0', '#7a3fb8', '#dcb4ff', '#eed6ff', '#ffb4ff', '#22103e', 1.2, true, 2.6, 140),
 );
 
 /** True when `kind` has its own designed creature (not the generic fallback). */

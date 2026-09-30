@@ -209,6 +209,8 @@ const seer: Painter = (P) => {
 const golem: Painter = (P) => {
   const { p, s, bounce } = P;
   const lift = -bounce * 0.05;
+  P.c.save();
+  P.c.scale(0.75, 0.75);
   poly(P, [-0.98, -0.85, -0.12, -0.85, -0.1, -0.02 - Math.max(0, s) * 0.12, -0.92, -0.02 - Math.max(0, s) * 0.12]);
   poly(P, [0.12, -0.85, 0.98, -0.85, 0.94, -0.02 - Math.max(0, -s) * 0.12, 0.1, -0.02 - Math.max(0, -s) * 0.12]);
   limb(P, [-1.3, -2.1 + lift, -1.6, -1.0 + s * 0.1], 0.6, p.shade);
@@ -230,6 +232,7 @@ const golem: Painter = (P) => {
   eye(P, -0.12, -2.8 + lift, 0.2, { glow: p.accent, brow: 1, angry: 1 });
   eye(P, 0.52, -2.8 + lift, 0.2, { glow: p.accent, brow: -1, angry: 1 });
   line(P, [-0.3, -2.55 + lift, 0.55, -2.55 + lift], LW * 1.2);
+  P.c.restore();
 };
 
 // ---- warden: the boss ------------------------------------------------------
@@ -336,7 +339,7 @@ export const BOXES: Readonly<Record<EnemyShape, Box>> = {
   wolf: { x0: -2.5, x1: 2.6, y0: -2.7, y1: 0.3 },
   imp: { x0: -1.7, x1: 2.1, y0: -3.9, y1: 0.3 },
   seer: { x0: -2.1, x1: 2.1, y0: -4.4, y1: 0.3 },
-  golem: { x0: -2.4, x1: 2.4, y0: -3.4, y1: 0.3 },
+  golem: { x0: -1.9, x1: 1.9, y0: -2.7, y1: 0.3 },
   warden: { x0: -3.0, x1: 3.2, y0: -5.4, y1: 0.4 },
   generic: { x0: -1.7, x1: 1.7, y0: -2.7, y1: 0.3 },
   genericRanged: { x0: -1.7, x1: 2.1, y0: -3.6, y1: 0.3 },

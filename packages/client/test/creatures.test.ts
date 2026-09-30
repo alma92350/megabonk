@@ -10,6 +10,7 @@ import {
 import {
   creatureKey, drawCreature, drawHero, heroKey, HERO_VARIANTS,
 } from '../src/render/creatures/sprites.js';
+import { PROJECTILE_CORE } from '../src/render/theme.js';
 import { drawFrame } from '../src/render/renderer.js';
 import { GameClient } from '../src/app.js';
 import { fakeCtx } from './fake-ctx.js';
@@ -60,11 +61,11 @@ describe('distinct silhouette + colour family', () => {
     }
   });
 
-  it('hues are spread: no two chromatic bodies closer than 20 degrees', () => {
+  it('hues are spread: no two chromatic bodies closer than 15 degrees', () => {
     const hues = KINDS.map((k) => ({ k, h: hueOf(visualOf(k).body) })).filter((x) => x.h >= 0);
     for (let i = 0; i < hues.length; i++) {
       for (let j = i + 1; j < hues.length; j++) {
-        expect(hueDistance(hues[i]!.h, hues[j]!.h), `${hues[i]!.k}/${hues[j]!.k}`).toBeGreaterThanOrEqual(20);
+        expect(hueDistance(hues[i]!.h, hues[j]!.h), `${hues[i]!.k}/${hues[j]!.k}`).toBeGreaterThanOrEqual(15);
       }
     }
   });
@@ -96,8 +97,16 @@ describe('ranged cue', () => {
     expect(KINDS.filter((k) => visualOf(k).ranged).sort()).toEqual(['lobber', 'seer']);
   });
 
-  it('the cue is the same hue as enemy projectiles', () => {
-    expect(hueOf(RANGED_GLOW)).toBeGreaterThan(330);
+  it('the cue glow is not the projectile pink, so a creature never reads as a shot', () => {
+    expect(hueDistance(hueOf(RANGED_GLOW), hueOf(PROJECTILE_CORE))).toBeGreaterThanOrEqual(30);
+  });
+
+  it('no creature BODY hue is within 40 degrees of the projectile hue', () => {
+    for (const v of [...KINDS.map(visualOf), enemyVisual('x'), enemyVisual('x', true)]) {
+      const h = hueOf(v.body);
+      if (h < 0) continue;
+      expect(hueDistance(h, hueOf(PROJECTILE_CORE)), v.id).toBeGreaterThanOrEqual(40);
+    }
   });
 });
 

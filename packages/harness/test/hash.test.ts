@@ -172,3 +172,48 @@ describe('contentFingerprint', () => {
     expect(contentFingerprint(renamed)).toBe(contentFingerprint(content));
   });
 });
+
+
+describe('hashState ignores display text, exactly as the content fingerprint does', () => {
+  /**
+   * Regression. The golden corpus's content fingerprint deliberately strips
+   * name/description/palette on the promise that "renaming an item does not"
+   * change a run. But offer options carry their display names INSIDE the game
+   * state, and the state hash covered them, so the promise was false: renaming
+   * five items to remove a borrowed term turned 15 goldens red with no
+   * behavioural change (proved by restoring only the names, which made all 29
+   * pass). Renaming is cosmetic; the two hashes must agree that it is.
+   */
+  const withOffer = (name: string, description: string, id = 'fury', rarity = 'rare') => ({
+    ...advance(300),
+    offer: {
+      source: 'level',
+      openedTick: 10,
+      rerollsUsed: 0,
+      options: [{ kind: 'tome', id, rarity, name, description }],
+    },
+  }) as unknown as GameState;
+
+  it('a renamed offer option hashes identically', () => {
+    expect(hashState(withOffer('Tome of Fury', 'Attack faster.'))).toBe(
+      hashState(withOffer('Rite of Fury', 'Swing quicker.')),
+    );
+  });
+
+  it('a renamed merchant item hashes identically', () => {
+    const stock = (name: string) => ({
+      ...advance(300),
+      merchant: {
+        pos: { x: 1, y: 2 },
+        stock: [{ option: { kind: 'item', id: 'boots', rarity: 'common', name, description: 'x' }, price: 40, sold: false }],
+      },
+    }) as unknown as GameState;
+    expect(hashState(stock('Stompers'))).toBe(hashState(stock('Heavy Boots')));
+  });
+
+  it('but a change to what the option IS still changes the hash', () => {
+    const base = hashState(withOffer('A', 'd'));
+    expect(hashState(withOffer('A', 'd', 'wrath'))).not.toBe(base);
+    expect(hashState(withOffer('A', 'd', 'fury', 'epic'))).not.toBe(base);
+  });
+});

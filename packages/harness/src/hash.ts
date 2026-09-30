@@ -185,8 +185,17 @@ export function hashString(input: string): string {
 }
 
 /** Stable structural hash of a whole `GameState` (or any state-shaped value). */
+/**
+ * Display text carried inside the game state (offer and merchant option cards).
+ * Purely cosmetic: the sim never reads it. It MUST be excluded here because the
+ * content fingerprint already strips the same keys on the promise that renaming
+ * does not change a run; if the state hash covered them the promise was false,
+ * and a pure rename turned every golden red with no behavioural change.
+ */
+const COSMETIC_STATE_KEYS: ReadonlySet<string> = new Set(['name', 'description']);
+
 export function hashState(state: unknown): string {
-  return hashString(canonicalise(state));
+  return hashString(canonicalise(state, { omitKeys: COSMETIC_STATE_KEYS }));
 }
 
 /**

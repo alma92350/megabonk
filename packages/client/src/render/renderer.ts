@@ -8,8 +8,9 @@ import { content } from '@megabonk/content';
 import { UNLOCKS } from '@megabonk/meta';
 import type { GameState, OfferOption } from '@megabonk/sim';
 import { getAdvice, type Advice } from '../advice.js';
+import { hubLayout, offerHeadingPlate, summaryLayout } from './layout.js';
 import type { GameClient } from '../app.js';
-import { formatCount, formatTime } from '../format.js';
+import { formatRuns, formatCount, formatTime } from '../format.js';
 import type { HudModel } from '../hud.js';
 import { roundedRect, type Ctx2D } from './ctx.js';
 import type { Viewport } from './projection.js';
@@ -257,6 +258,12 @@ function drawOffer(ctx: Ctx2D, client: GameClient, state: GameState, hud: HudMod
 
   const fromChest = offer.source === 'chest';
   const heading = fromChest ? 'CHEST REWARD' : 'LEVEL UP';
+  // A backing plate: the scrim alone lets a world sprite (a chest, say) show
+  // through the lettering.
+  const plate = offerHeadingPlate(view);
+  panel(ctx, plate.x, plate.y, plate.width, plate.height, {
+    radius: 8, fill: THEME.panel, edge: fromChest ? THEME.gold : THEME.panelEdge, alpha: 0.94,
+  });
   kicker(ctx, heading, view.width / 2, view.height * 0.14, 14,
     fromChest ? THEME.gold : THEME.xp, 'center');
   label(ctx,
@@ -421,23 +428,26 @@ function drawHub(ctx: Ctx2D, client: GameClient): void {
   const w = Math.min(560, view.width - 40);
   const x = view.width / 2 - w / 2;
   const entries = client.hubEntries();
-  const rowH = 58;
-  const h = 150 + entries.length * rowH;
+  const L = hubLayout(entries.length);
+  const rowH = L.rowH;
+  const h = L.panelH;
   const y = Math.max(10, view.height / 2 - h / 2);
 
   panel(ctx, x, y, w, h, { radius: 10 });
-  kicker(ctx, 'MEGABONK', x + 24, y + 44, 26, THEME.accent);
-  label(ctx, 'Verdant Hollow · 15 minutes · one life', x + 24, y + 66, 13, THEME.textDim);
+  kicker(ctx, 'MEGABONK', x + 24, y + L.titleY, 26, THEME.accent);
+  label(ctx, 'Verdant Hollow · 15 minutes · one life', x + 24, y + L.subtitleY, 13, THEME.textDim);
 
-  label(ctx, `${formatCount(client.profile.silver)} silver`, x + w - 24, y + 44, 18,
+  label(ctx, `${formatCount(client.profile.silver)} silver`, x + w - 24, y + L.silverY, 18,
     THEME.silver, 'right', 'bold');
+  // Its own line, right-aligned under the silver. It used to share a baseline
+  // with the subtitle, and the two ran into each other.
   label(ctx,
-    `${client.profile.runsPlayed} runs · best ${formatTime(client.profile.bestSeconds)}`,
-    x + w - 24, y + 64, 12, THEME.textDim, 'right');
+    `${formatRuns(client.profile.runsPlayed)} · best ${formatTime(client.profile.bestSeconds)}`,
+    x + w - 24, y + L.statsY, 12, THEME.textDim, 'right');
 
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i]!;
-    const rowY = y + 90 + i * rowH;
+    const rowY = y + L.rowsStart + i * rowH;
     const selected = i === client.hubIndex;
     const unlockDef = UNLOCKS.find((u) => u.id === entry.id);
     const edge = entry.kind === 'start'
@@ -463,7 +473,7 @@ function drawHub(ctx: Ctx2D, client: GameClient): void {
     }
   }
 
-  const footY = y + h - 34;
+  const footY = y + L.footerY;
   label(ctx, 'Arrows or W/S to move · Enter to confirm · H for controls',
     view.width / 2, footY, 12, THEME.textDim, 'center');
   if (!client.storageAvailable) {
@@ -483,8 +493,9 @@ function drawSummary(ctx: Ctx2D, client: GameClient): void {
   if (summary === null) return;
 
   const w = Math.min(600, view.width - 40);
-  const deltas = client.questDeltas.slice(0, 5);
-  const h = Math.min(view.height - 20, 250 + deltas.length * 22);
+  const L = summaryLayout(client.questDeltas.length, view.height);
+  const deltas = client.questDeltas.slice(0, L.visibleRows);
+  const h = L.panelH;
   const x = view.width / 2 - w / 2;
   const y = Math.max(10, view.height / 2 - h / 2);
 
@@ -513,24 +524,23 @@ function drawSummary(ctx: Ctx2D, client: GameClient): void {
     label(ctx, row[1], cx, cy + 22, 20, THEME.text, 'left', 'bold');
   }
 
-  const silverY = y + 190;
+  const silverY = y + L.silverY;
   panel(ctx, x + 24, silverY - 22, w - 48, 34, { radius: 5, fill: THEME.panelAlt, edge: THEME.silver });
   label(ctx, 'Silver earned', x + 36, silverY, 13, THEME.textDim, 'left');
   label(ctx, `+${formatCount(summary.silverEarned)} silver`, x + w - 36, silverY, 15,
     THEME.silver, 'right', 'bold');
 
-  let questY = silverY + 40;
-  if (deltas.length > 0) kicker(ctx, 'QUEST PROGRESS', x + 24, questY, 10, THEME.textDim);
-  questY += 18;
+  if (L.showQuestHeader) kicker(ctx, 'QUEST PROGRESS', x + 24, y + L.questHeaderY, 10, THEME.textDim);
+  let questY = y + L.questRowsStart;
   for (const d of deltas) {
     label(ctx, d.completed ? `${d.name} — complete` : d.name, x + 24, questY, 12,
       d.completed ? THEME.accent : THEME.text, 'left');
     label(ctx, `${Math.round(d.from)} → ${Math.round(d.to)} / ${d.target}`, x + w - 24, questY, 12,
       THEME.textDim, 'right');
-    questY += 22;
+    questY += L.questRowH;
   }
 
-  label(ctx, 'R — run again · Enter — back to the hub', view.width / 2, y + h - 18, 13,
+  label(ctx, 'R — run again · Enter — back to the hub', view.width / 2, y + L.footerY, 13,
     THEME.text, 'center', 'bold');
 }
 

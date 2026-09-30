@@ -21,6 +21,12 @@ export function formatCount(n: number): string {
   return `${(n / 1_000_000).toFixed(1)}M`;
 }
 
+/** "1 run", "2 runs". Never "1 runs", never NaN. */
+export function formatRuns(n: number): string {
+  const v = Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+  return `${v} ${v === 1 ? 'run' : 'runs'}`;
+}
+
 export function formatSigned(n: number): string {
   const v = Number.isFinite(n) ? Math.round(n) : 0;
   return v > 0 ? `+${v}` : String(v);

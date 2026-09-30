@@ -8,15 +8,17 @@ import { content } from '@megabonk/content';
 import { UNLOCKS } from '@megabonk/meta';
 import type { GameState, OfferOption } from '@megabonk/sim';
 import { getAdvice, type Advice } from '../advice.js';
-import { hubLayout, offerHeadingPlate, summaryLayout } from './layout.js';
+import { drawHub } from './hub.js';
+import { SUMMARY_SEED_SIZE, helpLayout, offerHeadingPlate, summaryHeading, summaryHeadingSize, summaryLayout } from './layout.js';
 import type { GameClient } from '../app.js';
 import { formatRuns, formatCount, formatTime } from '../format.js';
-import type { HudModel } from '../hud.js';
+import type { HudModel, LoadoutEntry } from '../hud.js';
 import { roundedRect, type Ctx2D } from './ctx.js';
 import type { Viewport } from './projection.js';
 import { pathRaritySigil } from './shapes.js';
-import { THEME, font, rarityVisual } from './theme.js';
-import { bar, kicker, label, panel, paragraph, scrim } from './ui.js';
+import { RARITY_PLATE, THEME, font, rarityVisual } from './theme.js';
+import { bar, heading, keycap, kicker, label, panel, paragraph, scrim } from './ui.js';
+import { drawIcon, iconKey } from './icons/index.js';
 import { cardKindLabel, cardMarkerFor, layoutCards, shouldShowReroll } from './upgrade.js';
 import { drawWorld, type WorldFrame } from './world.js';
 
@@ -43,13 +45,13 @@ export function drawFrame(ctx: Ctx2D, client: GameClient, nowMs = frameClock + 1
   if (view.width <= 0 || view.height <= 0) return;
 
   if (client.screen === 'hub') {
-    drawHub(ctx, client);
+    drawHub(ctx, client, nowMs);
     return;
   }
 
   const state = client.state;
   if (state === null) {
-    drawHub(ctx, client);
+    drawHub(ctx, client, nowMs);
     return;
   }
 
@@ -206,35 +208,41 @@ function drawHeart(ctx: Ctx2D, cx: number, cy: number, r: number, fill: string):
   ctx.stroke();
 }
 
+const BADGE_FONT = font(11, 'bold');
+const LOAD_TILE = 38;
+const LOAD_GAP = 6;
+
+function drawLoadoutTile(ctx: Ctx2D, e: LoadoutEntry, x: number, y: number): void {
+  const accent = e.kind === 'weapon' ? THEME.accent : e.rarity === null ? THEME.brassDim : rarityVisual(e.rarity as never).color;
+  panel(ctx, x, y, LOAD_TILE, LOAD_TILE, { compact: true, fill: THEME.barkAlt, edge: accent, alpha: 0.95 });
+  drawIcon(ctx, e.icon, x + LOAD_TILE / 2, y + LOAD_TILE / 2 - 1, 28);
+  ctx.font = BADGE_FONT;
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'alphabetic';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = THEME.ink;
+  ctx.lineWidth = 3;
+  ctx.strokeText(e.badge, x + LOAD_TILE - 3, y + LOAD_TILE - 4);
+  ctx.fillStyle = e.kind === 'weapon' ? THEME.accent : THEME.text;
+  ctx.fillText(e.badge, x + LOAD_TILE - 3, y + LOAD_TILE - 4);
+}
+
 function drawLoadout(ctx: Ctx2D, view: Viewport, hud: HudModel): void {
-  const entries = [...hud.weapons, ...hud.tomes, ...hud.items];
-  if (entries.length === 0) return;
-  const size = 34;
-  const gap = 6;
-  const cols = Math.max(1, Math.min(entries.length, Math.floor((view.width - 28) / (size + gap))));
-  const rows = Math.ceil(entries.length / cols);
+  const n = hud.weapons.length + hud.tomes.length + hud.items.length;
+  if (n === 0) return;
+  const size = LOAD_TILE;
+  const gap = LOAD_GAP;
+  const cols = Math.max(1, Math.min(n, Math.floor((view.width - 28) / (size + gap))));
+  const rows = Math.ceil(n / cols);
   const totalW = cols * size + (cols - 1) * gap;
   const x0 = view.width / 2 - totalW / 2;
   const y0 = view.height - 16 - rows * (size + gap);
-
-  for (let i = 0; i < entries.length; i++) {
-    const e = entries[i]!;
-    const col = i % cols;
-    const row = Math.floor(i / cols);
-    const x = x0 + col * (size + gap);
-    const y = y0 + row * (size + gap);
-    const visual = e.rarity === null ? null : rarityVisual(e.rarity as never);
-    panel(ctx, x, y, size, size, {
-      radius: 4,
-      fill: THEME.panelAlt,
-      edge: e.kind === 'weapon' ? THEME.accent : visual?.color ?? THEME.panelEdge,
-      alpha: 0.9,
-    });
-    // Initials, not icons: legible at 34px and honest about what it is.
-    label(ctx, e.name.slice(0, 2).toUpperCase(), x + size / 2, y + size / 2 + 4, 13,
-      THEME.text, 'center', 'bold');
-    label(ctx, `${e.kind === 'weapon' ? 'L' : '×'}${e.stacks}`, x + size - 3, y + size - 3, 10,
-      e.kind === 'weapon' ? THEME.accent : THEME.textDim, 'right', 'bold');
+  let i = 0;
+  const lists = [hud.weapons, hud.tomes, hud.items];
+  for (const list of lists) {
+    for (let k = 0; k < list.length; k++, i++) {
+      drawLoadoutTile(ctx, list[k]!, x0 + (i % cols) * (size + gap), y0 + Math.floor(i / cols) * (size + gap));
+    }
   }
 }
 
@@ -281,18 +289,18 @@ function drawOffer(ctx: Ctx2D, client: GameClient, state: GameState, hud: HudMod
   scrim(ctx, view.width, view.height, 0.78);
 
   const fromChest = offer.source === 'chest';
-  const heading = fromChest ? 'CHEST REWARD' : 'LEVEL UP';
+  const heading_ = fromChest ? 'CHEST REWARD' : 'LEVEL UP';
   // A backing plate: the scrim alone lets a world sprite (a chest, say) show
   // through the lettering.
   const plate = offerHeadingPlate(view);
   panel(ctx, plate.x, plate.y, plate.width, plate.height, {
-    radius: 8, fill: THEME.panel, edge: fromChest ? THEME.gold : THEME.panelEdge, alpha: 0.94,
+    radius: 12, edge: fromChest ? THEME.gold : undefined, alpha: 0.96,
   });
-  kicker(ctx, heading, view.width / 2, view.height * 0.14, 14,
+  heading(ctx, heading_, view.width / 2, view.height * 0.14 + 4, 24,
     fromChest ? THEME.gold : THEME.xp, 'center');
   label(ctx,
     fromChest ? 'Rarer than a level-up. Choose your spoils.' : `Level ${hud.level} — choose an upgrade`,
-    view.width / 2, view.height * 0.14 + 24, 14, THEME.textDim, 'center');
+    view.width / 2, view.height * 0.14 + 28, 14, THEME.textDim, 'center');
 
   const advice = getAdvice();
   const cards = layoutCards(offer.options.length, view);
@@ -322,29 +330,56 @@ function drawCard(
   const v = rarityVisual(option.rarity);
   const { x, y, width: w, height: h } = card;
 
-  panel(ctx, x, y, w, h, { radius: 8, fill: THEME.panel, edge: v.color, alpha: 0.97 });
+  panel(ctx, x, y, w, h, { radius: 12, edge: v.color, alpha: 0.98 });
 
   // Rarity band. Colour is ONE of four cues, never the only one.
   ctx.fillStyle = v.dim;
-  roundedRect(ctx, x + 1.5, y + 1.5, w - 3, h * 0.36, 7);
+  roundedRect(ctx, x + 7, y + 7, w - 14, h * 0.42, 8);
   ctx.fill();
 
-  // Cue 2: the sigil.
-  const sigilR = Math.min(22, w * 0.11);
+  // Cue 2: the sigil, top-left corner.
+  const sigilR = Math.min(15, w * 0.065);
   ctx.fillStyle = v.color;
-  pathRaritySigil(ctx, v.shape, x + w / 2, y + h * 0.15, sigilR);
+  pathRaritySigil(ctx, v.shape, x + 14 + sigilR, y + 14 + sigilR, sigilR);
   ctx.fill();
   ctx.strokeStyle = THEME.ink;
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 2;
   ctx.stroke();
 
+  // Icon plate: a lit plate so the ink-outlined icon pops on any rarity.
+  const plate = Math.min(w * 0.36, h * 0.24);
+  const px = x + w / 2 - plate / 2;
+  const py = y + h * 0.055;
+  ctx.fillStyle = RARITY_PLATE[option.rarity] ?? RARITY_PLATE.common;
+  roundedRect(ctx, px, py, plate, plate, 12);
+  ctx.fill();
+  ctx.save();
+  roundedRect(ctx, px, py, plate, plate, 12);
+  ctx.clip();
+  // Shine sweep (static): a lighter diagonal band.
+  ctx.globalAlpha = fromChest ? 0.55 : 0.35;
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.moveTo(px + plate * 0.05, py + plate);
+  ctx.lineTo(px + plate * 0.45, py);
+  ctx.lineTo(px + plate * 0.65, py);
+  ctx.lineTo(px + plate * 0.25, py + plate);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+  ctx.strokeStyle = THEME.ink;
+  ctx.lineWidth = 3;
+  roundedRect(ctx, px, py, plate, plate, 12);
+  ctx.stroke();
+  drawIcon(ctx, iconKey(option.kind, option.id), px + plate / 2, py + plate / 2, plate * 0.82);
+
   // Cue 3: the word.
-  kicker(ctx, v.label, x + w / 2, y + h * 0.3, Math.max(10, w * 0.052), v.color, 'center');
+  kicker(ctx, v.label, x + w / 2, y + h * 0.345, Math.max(11, w * 0.055), v.color, 'center');
 
   // Cue 4: countable pips.
   const pipR = Math.max(2, w * 0.013);
   const pipGap = pipR * 3.2;
-  const pipY = y + h * 0.345;
+  const pipY = y + h * 0.385;
   const pipStart = x + w / 2 - ((v.pips - 1) * pipGap) / 2;
   ctx.fillStyle = v.color;
   ctx.beginPath();
@@ -354,21 +389,24 @@ function drawCard(
   }
   ctx.fill();
 
-  label(ctx, option.name, x + w / 2, y + h * 0.48, Math.max(13, w * 0.066), THEME.text, 'center', 'bold');
+  label(ctx, option.name, x + w / 2, y + h * 0.5, Math.max(14, w * 0.07), THEME.text, 'center', 'bold');
   const kindText = option.kind === 'gold' ? `+${option.goldAmount ?? 0} GOLD` : cardKindLabel(option.kind);
-  kicker(ctx, kindText, x + w / 2, y + h * 0.56, Math.max(9, w * 0.042), THEME.textDim, 'center');
-  paragraph(ctx, option.description, x + w / 2, y + h * 0.66, w - 26,
-    Math.max(11, w * 0.05), THEME.textDim, 4, 'center');
+  kicker(ctx, kindText, x + w / 2, y + h * 0.575, Math.max(11, w * 0.045), THEME.brass, 'center');
+  paragraph(ctx, option.description, x + w / 2, y + h * 0.66, w - 30,
+    Math.max(12, w * 0.05), THEME.text, 4, 'center');
 
   // The hotkey, bottom-centre: keyboard-first by construction.
   ctx.fillStyle = v.color;
   ctx.beginPath();
-  ctx.arc(x + w / 2, y + h - 22, 13, 0, Math.PI * 2);
+  ctx.arc(x + w / 2, y + h - 24, 13, 0, Math.PI * 2);
   ctx.fill();
-  label(ctx, String(card.index + 1), x + w / 2, y + h - 17, 15, THEME.ink, 'center', 'bold');
+  ctx.strokeStyle = THEME.ink;
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+  label(ctx, String(card.index + 1), x + w / 2, y + h - 19, 15, THEME.ink, 'center', 'bold');
 
   if (fromChest) {
-    kicker(ctx, 'CHEST', x + 10, y + h - 10, 9, THEME.gold);
+    kicker(ctx, 'CHEST', x + 16, y + h - 14, 11, THEME.gold);
   }
 
   if (marked) {
@@ -403,108 +441,20 @@ function drawAdvisorPanel(ctx: Ctx2D, view: Viewport, advice: Advice): void {
 
 function drawPause(ctx: Ctx2D, view: Viewport): void {
   scrim(ctx, view.width, view.height, 0.6);
-  kicker(ctx, 'PAUSED', view.width / 2, view.height / 2 - 6, 22, THEME.text, 'center');
+  heading(ctx, 'PAUSED', view.width / 2, view.height / 2 - 6, 30, THEME.text, 'center');
   label(ctx, 'Escape or Enter to resume · H for controls', view.width / 2, view.height / 2 + 22,
     14, THEME.textDim, 'center');
 }
 
-const HELP_LINES: readonly string[] = [
-  'WASD or arrows — move',
-  '1 / 2 / 3 — choose an upgrade, or buy from the merchant',
-  'R — reroll an offer (when unlocked) · restart from the summary',
-  'Escape — pause · Enter or Space — confirm',
-  'H — close this panel',
-];
-
 function drawHelp(ctx: Ctx2D, view: Viewport): void {
-  const w = Math.min(460, view.width - 40);
-  const h = 44 + HELP_LINES.length * 22;
-  const x = view.width / 2 - w / 2;
-  const y = view.height / 2 - h / 2;
+  const L = helpLayout(view);
+  const { x, y, width: w, height: h } = L.panel;
   scrim(ctx, view.width, view.height, 0.55);
-  panel(ctx, x, y, w, h, { radius: 8 });
-  kicker(ctx, 'CONTROLS', x + 16, y + 26, 13, THEME.accent);
-  for (let i = 0; i < HELP_LINES.length; i++) {
-    label(ctx, HELP_LINES[i]!, x + 16, y + 52 + i * 22, 13, THEME.text, 'left');
-  }
-}
-
-// ---- meta hub ------------------------------------------------------------
-
-function drawBackdrop(ctx: Ctx2D, view: Viewport): void {
-  ctx.fillStyle = THEME.void;
-  ctx.fillRect(0, 0, view.width, view.height);
-  // Slow diagonal hatch, the title-screen echo of the in-world lattice.
-  ctx.strokeStyle = '#0d1a14';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  for (let i = -view.height; i < view.width; i += 26) {
-    ctx.moveTo(i, 0);
-    ctx.lineTo(i + view.height, view.height);
-  }
-  ctx.stroke();
-}
-
-function drawHub(ctx: Ctx2D, client: GameClient): void {
-  const view = client.view;
-  drawBackdrop(ctx, view);
-
-  const w = Math.min(560, view.width - 40);
-  const x = view.width / 2 - w / 2;
-  const entries = client.hubEntries();
-  const L = hubLayout(entries.length);
-  const rowH = L.rowH;
-  const h = L.panelH;
-  const y = Math.max(10, view.height / 2 - h / 2);
-
-  panel(ctx, x, y, w, h, { radius: 10 });
-  kicker(ctx, 'HOLLOWLIGHT', x + 24, y + L.titleY, 26, THEME.accent);
-  label(ctx, 'Verdant Hollow · 15 minutes · one life', x + 24, y + L.subtitleY, 13, THEME.textDim);
-
-  label(ctx, `${formatCount(client.profile.silver)} motes`, x + w - 24, y + L.silverY, 18,
-    THEME.silver, 'right', 'bold');
-  // Its own line, right-aligned under the silver. It used to share a baseline
-  // with the subtitle, and the two ran into each other.
-  label(ctx,
-    `${formatRuns(client.profile.runsPlayed)} · best ${formatTime(client.profile.bestSeconds)}`,
-    x + w - 24, y + L.statsY, 12, THEME.textDim, 'right');
-
-  for (let i = 0; i < entries.length; i++) {
-    const entry = entries[i]!;
-    const rowY = y + L.rowsStart + i * rowH;
-    const selected = i === client.hubIndex;
-    const unlockDef = UNLOCKS.find((u) => u.id === entry.id);
-    const edge = entry.kind === 'start'
-      ? THEME.accent
-      : entry.owned ? THEME.accent : entry.affordable ? THEME.silver : THEME.panelEdge;
-    panel(ctx, x + 18, rowY, w - 36, rowH - 10, {
-      radius: 6,
-      fill: selected ? THEME.panelAlt : THEME.panel,
-      edge: selected ? THEME.text : edge,
-      alpha: selected ? 1 : 0.9,
-    });
-    // Selection is marked by a caret as well as by the border, so the focused row
-    // is unambiguous without relying on a colour difference (NFR-3).
-    if (selected) label(ctx, '>', x + 26, rowY + 30, 16, THEME.accent, 'left', 'bold');
-    label(ctx, entry.label, x + 44, rowY + 22, 15, THEME.text, 'left', 'bold');
-    label(ctx, entry.detail, x + 44, rowY + 40, 12, THEME.textDim, 'left');
-    if (entry.kind === 'unlock') {
-      const right = entry.owned ? 'OWNED' : `${unlockDef?.cost ?? entry.cost} motes`;
-      label(ctx, right, x + w - 30, rowY + 30, 13,
-        entry.owned ? THEME.accent : entry.affordable ? THEME.silver : THEME.textDim, 'right', 'bold');
-    } else {
-      label(ctx, 'ENTER', x + w - 30, rowY + 30, 13, THEME.accent, 'right', 'bold');
-    }
-  }
-
-  const footY = y + L.footerY;
-  label(ctx, 'Arrows or W/S to move · Enter to confirm · H for controls',
-    view.width / 2, footY, 12, THEME.textDim, 'center');
-  if (!client.storageAvailable) {
-    label(ctx, 'Storage unavailable — progress will not be saved this session',
-      view.width / 2, footY + 18, 12, THEME.hpLow, 'center');
-  } else if (client.notice !== null) {
-    label(ctx, client.notice, view.width / 2, footY + 18, 12, THEME.gold, 'center');
+  panel(ctx, x, y, w, h);
+  heading(ctx, 'CONTROLS', x + 16, y + L.titleY, 22, THEME.brassHi);
+  for (const c of L.cells) {
+    for (const cap of c.caps) keycap(ctx, x + c.x + cap.x, y + c.y, cap.w, c.capH, cap.label);
+    label(ctx, c.text, x + c.x + c.textX, y + c.y + 18, 14, THEME.text, 'left');
   }
 }
 
@@ -523,11 +473,20 @@ function drawSummary(ctx: Ctx2D, client: GameClient): void {
   const x = view.width / 2 - w / 2;
   const y = Math.max(10, view.height / 2 - h / 2);
 
-  panel(ctx, x, y, w, h, { radius: 10 });
+  panel(ctx, x, y, w, h);
   const survived = summary.outcome === 'survived';
-  kicker(ctx, survived ? 'SURVIVED' : 'YOU DIED', x + 24, y + 44, 24,
-    survived ? THEME.accent : THEME.hp);
-  label(ctx, `Seed ${summary.seed}`, x + w - 24, y + 42, 12, THEME.textDim, 'right');
+  const title = summaryHeading(summary.outcome);
+  heading(ctx, title, x + 24, y + L.headingY, summaryHeadingSize(title, w),
+    survived ? THEME.accent : THEME.brassHi);
+  // The seed sits on its own line under the heading, never beside it.
+  label(ctx, `Seed ${summary.seed}`, x + 24, y + L.seedY, SUMMARY_SEED_SIZE, THEME.textDim, 'left');
+
+  // Motes lead the reward block.
+  const motesY = y + L.motesY;
+  panel(ctx, x + 24, y + L.motesBarTop, w - 48, L.motesBarH, { radius: 9, fill: THEME.barkAlt, edge: THEME.silver });
+  label(ctx, 'Motes earned', x + 40, motesY, 14, THEME.textDim, 'left');
+  label(ctx, `+${formatCount(summary.silverEarned)} motes`, x + w - 40, motesY, 16,
+    THEME.silver, 'right', 'bold');
 
   const rows: Array<[string, string]> = [
     ['Time', formatTime(summary.seconds)],
@@ -540,19 +499,11 @@ function drawSummary(ctx: Ctx2D, client: GameClient): void {
   const colW = (w - 48) / 3;
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]!;
-    const col = i % 3;
-    const line = Math.floor(i / 3);
-    const cx = x + 24 + col * colW;
-    const cy = y + 84 + line * 48;
-    kicker(ctx, row[0].toUpperCase(), cx, cy, 10, THEME.textDim);
-    label(ctx, row[1], cx, cy + 22, 20, THEME.text, 'left', 'bold');
+    const cx = x + 24 + (i % 3) * colW;
+    const cy = y + L.statsStart + Math.floor(i / 3) * L.statsRowH;
+    kicker(ctx, row[0].toUpperCase(), cx, cy, 11, THEME.textDim);
+    label(ctx, row[1], cx, cy + L.statsValueDy, 20, THEME.text, 'left', 'bold');
   }
-
-  const silverY = y + L.silverY;
-  panel(ctx, x + 24, silverY - 22, w - 48, 34, { radius: 5, fill: THEME.panelAlt, edge: THEME.silver });
-  label(ctx, 'Motes earned', x + 36, silverY, 13, THEME.textDim, 'left');
-  label(ctx, `+${formatCount(summary.silverEarned)} motes`, x + w - 36, silverY, 15,
-    THEME.silver, 'right', 'bold');
 
   if (L.showQuestHeader) kicker(ctx, 'QUEST PROGRESS', x + 24, y + L.questHeaderY, 10, THEME.textDim);
   let questY = y + L.questRowsStart;

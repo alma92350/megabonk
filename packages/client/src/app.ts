@@ -44,6 +44,7 @@ import { detectStorage, loadProfile, saveProfile, type StoragePort } from './sto
 import { saveRecording } from './recordings.js';
 import type { Viewport } from './render/projection.js';
 import { FxManager } from './render/fx/index.js';
+import { Atmosphere, attachAtmosphere } from './render/atmosphere/index.js';
 
 export type Screen = 'hub' | 'run' | 'summary';
 
@@ -120,6 +121,8 @@ export class GameClient {
   readonly reduceMotion: boolean;
   /** Display-only combat effects; derived from state pairs, never read by the sim. */
   readonly combatFx: FxManager;
+  /** Boss arrival, ambient motes and chest light: display-only, derived from state pairs. */
+  readonly atmosphere: Atmosphere;
 
   private readonly storage: StoragePort | null;
   private readonly seedSource: () => number;
@@ -161,6 +164,8 @@ export class GameClient {
     this.view = options.viewport ?? DEFAULT_VIEW;
     this.reduceMotion = options.reduceMotion ?? false;
     this.combatFx = new FxManager({ reduceMotion: this.reduceMotion });
+    this.atmosphere = new Atmosphere({ reduceMotion: this.reduceMotion });
+    attachAtmosphere(this.combatFx, this.atmosphere);
     this.seedSource = options.seedSource ?? randomSeed;
     this.storage = options.storage === undefined ? detectStorage() : options.storage;
 
@@ -185,6 +190,7 @@ export class GameClient {
     this.state = state;
     this.prev = state;
     this.combatFx.clear();
+    this.atmosphere.clear();
     this.events = [...state.events];
     this.acc = 0;
     this.alpha = 0;
@@ -469,6 +475,10 @@ export class GameClient {
   private observe(before: GameState, after: GameState): void {
     for (const e of after.events) this.events.push(e);
     this.combatFx.observe(before, after, content.weapons, content.enemies);
+    this.atmosphere.observe(before, after);
+    // Low rumble while the boss arrives (already scaled down for reduced motion).
+    const rumble = this.atmosphere.takeRumble();
+    if (rumble > 0) this.fx.shake = Math.min(1, this.fx.shake + rumble);
 
     if (after.player.hp < before.player.hp) {
       this.flash('damageFlash', 0.85);

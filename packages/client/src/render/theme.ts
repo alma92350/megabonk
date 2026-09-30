@@ -14,8 +14,10 @@
  *  - HEIGHT is sold by a flat elliptical contact shadow plus a darker extruded
  *    side face on obstacles. No blur anywhere in the entity loop — a shadowBlur
  *    per entity is the single most reliable way to drop below 60 FPS.
- *  - UI is "stamped brass on slate": slab panels, thin bright rules, all-caps
- *    labels, and heraldic sigils for rarity.
+ *  - UI speaks the world's language (bible section 11): deep bark-brown panels
+ *    with a 3 px ink outline, 10-12 px rounded corners and a brass highlight on
+ *    the TOP edge only; chunky ink-outlined headings, no tracked lettering; and
+ *    painted icons (./icons) inside rarity-coloured frames.
  *
  * Contrast targets: body text on panel is well past 7:1, and every semantic
  * colour is paired with a shape or a label so colour is never load-bearing
@@ -47,6 +49,16 @@ export const THEME = {
   merchant: '#ffd98a',
   advisor: '#a892ff',
   shadow: 'rgba(0,0,0,0.42)',
+  /** UI tokens (bark-brown panels, brass trim). Colour-meaning hues above are untouched. */
+  bark: '#2c2119',
+  barkAlt: '#3a2c20',
+  barkDeep: '#1a120d',
+  brass: '#d9a94e',
+  brassHi: '#f6d88a',
+  brassDim: '#7d5f2e',
+  parchment: '#ebe1c8',
+  keycap: '#f1e8d0',
+  keycapEdge: '#b9a678',
   outline: '#03060700',
 } as const;
 
@@ -76,6 +88,19 @@ export const RARITY_VISUALS: Readonly<Record<Rarity, RarityVisual>> = Object.fre
   rare: { rarity: 'rare', color: '#57a8ff', dim: '#1b3350', shape: 'shield', label: 'RARE', pips: 3 },
   epic: { rarity: 'epic', color: '#c477ff', dim: '#37204f', shape: 'star', label: 'EPIC', pips: 4 },
   legendary: { rarity: 'legendary', color: '#ffb23f', dim: '#4a3213', shape: 'crown', label: 'LEGENDARY', pips: 5 },
+});
+
+/**
+ * A light tint of each rarity hue for the icon plate on a card: icons are
+ * outlined in ink and sit on a lit plate, which also cures the warm-on-warm look
+ * of a gold rarity on a brown card body (P2-6).
+ */
+export const RARITY_PLATE: Readonly<Record<Rarity, string>> = Object.freeze({
+  common: '#dfe5d6',
+  uncommon: '#c9efcf',
+  rare: '#c3e0ff',
+  epic: '#e6d0ff',
+  legendary: '#ffe6a6',
 });
 
 export function rarityVisual(rarity: Rarity): RarityVisual {

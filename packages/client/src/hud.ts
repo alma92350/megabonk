@@ -8,6 +8,7 @@
 
 import { TICKS_PER_SECOND, xpForLevel, type ContentBundle, type GameState } from '@megabonk/sim';
 import { formatCount, formatInt, formatTime } from './format.js';
+import { iconKey } from './render/icons/keys.js';
 
 export type LoadoutKind = 'weapon' | 'tome' | 'item';
 
@@ -19,6 +20,10 @@ export interface LoadoutEntry {
   readonly level: number;
   readonly stacks: number;
   readonly rarity: string | null;
+  /** Key into the icon set (render/icons); never the fallback for real content. */
+  readonly icon: string;
+  /** Level / stack readout, precomputed so drawing allocates nothing: "L3" or "×2". */
+  readonly badge: string;
 }
 
 export interface BossReadout {
@@ -80,6 +85,8 @@ export function buildHud(state: GameState, content: ContentBundle): HudModel {
       level: w.level,
       stacks: w.level,
       rarity: null,
+      icon: iconKey('weapon', w.id),
+      badge: `L${w.level}`,
     });
   }
 
@@ -94,6 +101,8 @@ export function buildHud(state: GameState, content: ContentBundle): HudModel {
       level: h.stacks,
       stacks: h.stacks,
       rarity: h.rarity,
+      icon: iconKey(tome ? 'tome' : 'item', h.id),
+      badge: `×${h.stacks}`,
     };
     (tome ? tomes : items).push(entry);
   }

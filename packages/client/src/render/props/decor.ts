@@ -65,3 +65,63 @@ export function countDecor(r: CellRange): number {
   }
   return n;
 }
+
+// ---- large scatter: fallen logs and mushroom rings ---------------------------
+// A second, sparser lattice so these read as rare landmarks, not carpet.
+
+export const LARGE_CELL = 13;
+export const MAX_LARGE = 24;
+export const LARGE_NONE = 0;
+export const LARGE_LOG = 1;
+export const LARGE_RING = 2;
+export type LargeKind = 0 | 1 | 2;
+
+export function largeHash(cx: number, cy: number): number {
+  return cellHash(cx + 7919, cy - 104729);
+}
+
+/** ~22% of cells hold something: about one log and one ring per 5 cells. */
+export function largeKind(h: number): LargeKind {
+  const r = h & 1023;
+  if (r < 800) return LARGE_NONE;
+  return r < 915 ? LARGE_LOG : LARGE_RING;
+}
+
+export function largeX(h: number, cx: number): number {
+  return (cx + 0.2 + (((h >>> 10) & 255) / 255) * 0.6) * LARGE_CELL;
+}
+export function largeY(h: number, cy: number): number {
+  return (cy + 0.2 + (((h >>> 18) & 255) / 255) * 0.6) * LARGE_CELL;
+}
+
+export function largeCellRange(
+  minX: number, maxX: number, minY: number, maxY: number, out: { x0: number; x1: number; y0: number; y1: number },
+): void {
+  out.x0 = Math.floor(minX / LARGE_CELL);
+  out.x1 = Math.floor(maxX / LARGE_CELL);
+  out.y0 = Math.floor(minY / LARGE_CELL);
+  out.y1 = Math.floor(maxY / LARGE_CELL);
+}
+
+export function countLarge(r: CellRange): number {
+  let n = 0;
+  for (let cy = r.y0; cy <= r.y1; cy++) {
+    for (let cx = r.x0; cx <= r.x1; cx++) {
+      if (largeKind(largeHash(cx, cy)) !== LARGE_NONE && ++n >= MAX_LARGE) return MAX_LARGE;
+    }
+  }
+  return n;
+}
+
+/** True when (x, y) is within `dist` of any interactable: scatter keeps clear of them. */
+export function nearInteractable(
+  x: number, y: number, list: ReadonlyArray<{ readonly pos: { readonly x: number; readonly y: number } }>, dist: number,
+): boolean {
+  const d2 = dist * dist;
+  for (let i = 0; i < list.length; i++) {
+    const p = list[i]!.pos;
+    const dx = p.x - x, dy = p.y - y;
+    if (dx * dx + dy * dy < d2) return true;
+  }
+  return false;
+}

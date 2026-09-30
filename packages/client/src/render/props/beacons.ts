@@ -113,28 +113,86 @@ function badge(
   ctx.globalAlpha = 1;
 }
 
-export function drawBeacons(
-  ctx: Ctx2D, state: GameState, cam: Camera, view: Viewport, time: number, reduce: boolean,
-): void {
+export const BEACON_MAX = 3;
+
+export type BeaconKind = 'chest' | 'shrine' | 'merchant';
+
+export interface BeaconPick {
+  kind: BeaconKind;
+  id: number;
+  dist: number;
+  shrineId: string | undefined;
+  x: number;
+  y: number;
+  angle: number;
+}
+
+const picks: BeaconPick[] = [0, 1, 2].map(() => ({
+  kind: 'chest' as BeaconKind, id: 0, dist: 0, shrineId: undefined, x: 0, y: 0, angle: 0,
+}));
+
+function take(slot: number, kind: BeaconKind, id: number, dist: number, shrineId: string | undefined): void {
+  const p = picks[slot]!;
+  p.kind = kind; p.id = id; p.dist = dist; p.shrineId = shrineId;
+  p.x = place.x; p.y = place.y; p.angle = place.angle;
+}
+
+/**
+ * At most BEACON_MAX badges: the nearest armed off-screen chest, the nearest
+ * armed off-screen shrine, and the merchant when present. There are never
+ * XP-chevron beacons: gems are short-range and the magnet handles them.
+ * Fills `out` (cleared first) with reused records; returns the count.
+ */
+export function selectBeacons(
+  state: GameState, cam: Camera, view: Viewport, out: BeaconPick[],
+): number {
+  out.length = 0;
   const list = state.interactables;
+  let chest = -1, chestD = Infinity, shrine = -1, shrineD = Infinity;
   for (let i = 0; i < list.length; i++) {
     const it = list[i]!;
     if (it.used) continue;
+    const d = Math.hypot(it.pos.x - cam.x, it.pos.y - cam.y);
+    if (it.kind === 'chest' ? d >= chestD : d >= shrineD) continue;
     const sx = projectX(it.pos.x, cam, view), sy = projectY(it.pos.y, 0, cam, view);
     if (!beaconPlacement(sx, sy, view, BEACON_INSET, BEACON_INSET_Y, place)) continue;
-    const d = Math.hypot(it.pos.x - cam.x, it.pos.y - cam.y);
-    const pulse = glowPulse(time, it.id, reduce);
-    if (it.kind === 'chest') badge(ctx, place, CHEST_GLOW, beaconAlpha(d), pulse, 'chest', 'star');
-    else {
-      const t = shrineTint(it.shrineId);
-      badge(ctx, place, t.color, beaconAlpha(d), pulse, 'glyph', t.glyph);
+    if (it.kind === 'chest') {
+      chest = i; chestD = d;
+      take(0, 'chest', it.id, d, undefined);
+    } else {
+      shrine = i; shrineD = d;
+      take(1, 'shrine', it.id, d, it.shrineId);
     }
   }
+  if (chest >= 0) out.push(picks[0]!);
+  if (shrine >= 0) out.push(picks[1]!);
   const m = state.merchant;
   if (m !== null) {
     const sx = projectX(m.pos.x, cam, view), sy = projectY(m.pos.y, 0, cam, view);
     if (beaconPlacement(sx, sy, view, BEACON_INSET, BEACON_INSET_Y, place)) {
-      badge(ctx, place, MERCHANT_GLOW, beaconAlpha(Math.hypot(m.pos.x - cam.x, m.pos.y - cam.y)), glowPulse(time, 0.7, reduce), 'purse', 'star');
+      take(2, 'merchant', 0, Math.hypot(m.pos.x - cam.x, m.pos.y - cam.y), undefined);
+      out.push(picks[2]!);
+    }
+  }
+  return out.length;
+}
+
+const chosen: BeaconPick[] = [];
+
+export function drawBeacons(
+  ctx: Ctx2D, state: GameState, cam: Camera, view: Viewport, time: number, reduce: boolean,
+): void {
+  const n = selectBeacons(state, cam, view, chosen);
+  for (let i = 0; i < n; i++) {
+    const p = chosen[i]!;
+    place.x = p.x; place.y = p.y; place.angle = p.angle;
+    const a = beaconAlpha(p.dist);
+    if (p.kind === 'chest') badge(ctx, place, CHEST_GLOW, a, glowPulse(time, p.id, reduce), 'chest', 'star');
+    else if (p.kind === 'shrine') {
+      const t = shrineTint(p.shrineId);
+      badge(ctx, place, t.color, a, glowPulse(time, p.id, reduce), 'glyph', t.glyph);
+    } else {
+      badge(ctx, place, MERCHANT_GLOW, a, glowPulse(time, 0.7, reduce), 'purse', 'star');
     }
   }
 }

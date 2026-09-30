@@ -31,6 +31,7 @@ import {
   font,
 } from './theme.js';
 import type { FxManager } from './fx/manager.js';
+import { atmosphereOf } from './atmosphere/index.js';
 import { pathContactShadow } from './shapes.js';
 import { animFrame, creatureCache, drawCreature, drawHero, facingFor } from './creatures/index.js';
 import {
@@ -143,7 +144,7 @@ export function drawGround(ctx: Ctx2D, frame: WorldFrame): void {
   const farCam: Camera = { x: cam.x * 0.88, y: cam.y * 0.88, zoom: cam.zoom };
   drawLattice(ctx, farCam, view, half * 1.3, 9, palette.groundAlt, 3);
   drawLattice(ctx, cam, view, half, 3, palette.groundAlt, 1);
-  drawGroundDecor(ctx, cam, view, half);
+  drawGroundDecor(ctx, cam, view, half, state.interactables);
 
   ctx.restore();
 
@@ -327,6 +328,7 @@ function drawEnemy(ctx: Ctx2D, frame: WorldFrame, index: number, wx: number, wy:
   const x = projectX(wx, cam, view);
   const y = projectY(wy, 0, cam, view);
   // One sprite unit is one (hit radius x visual scale) of world space.
+  const atmo = e.isBoss ? atmosphereOf(frame.fx) : null;
   const unit = e.radius * visual.scale * cam.zoom;
 
   // Facing follows movement (the sim's per-tick delta, not the interpolated one)
@@ -337,7 +339,8 @@ function drawEnemy(ctx: Ctx2D, frame: WorldFrame, index: number, wx: number, wy:
   const step = animFrame(frame.time, e.id, visual.frameMs, frame.reduceMotion === true);
 
   const dying = e.dyingFor !== undefined;
-  let swell = 1;
+  // Boss arrival scales the baked sprite (no re-bake at intermediate sizes).
+  let swell = atmo !== null ? atmo.bossScale(e.id) : 1;
   if (dying) {
     const t = Math.max(0, Math.min(1, e.dyingFor! / DEATH_FADE_TICKS));
     ctx.globalAlpha = t * 0.8;
@@ -363,6 +366,8 @@ function drawEnemy(ctx: Ctx2D, frame: WorldFrame, index: number, wx: number, wy:
     ctx.globalAlpha = 1;
     return;
   }
+
+  if (atmo !== null) atmo.drawBossTell(ctx, frame, e, x, y, unit, y - unit * visual.height * 0.64);
 
   // The boss's health lives in the top banner only (a second overhead bar duplicated it).
   if (!e.isBoss && e.hp < e.maxHp) {
@@ -469,9 +474,13 @@ function drawPlayer(ctx: Ctx2D, frame: WorldFrame, wx: number, wy: number, hurt:
 }
 
 export function drawWorld(ctx: Ctx2D, frame: WorldFrame, hurt: number): void {
+  const atmo = atmosphereOf(frame.fx);
+  atmo?.advance(frame.time);
   drawGround(ctx, frame);
   const buffer = buildSprites(frame);
   drawShadows(ctx, frame, buffer);
+  // Chest light, boss arrival cracks and the contact-reach ring lie on the ground.
+  atmo?.drawGround(ctx, frame);
 
   for (const s of buffer.items()) {
     switch (s.kind) {
@@ -488,8 +497,11 @@ export function drawWorld(ctx: Ctx2D, frame: WorldFrame, hurt: number): void {
 
   // Combat feedback sits above every actor and below fog and the HUD.
   frame.fx?.draw(ctx, frame);
+  // Slow embers drift over the scene, well under every pickup and shot.
+  atmo?.drawMotes(ctx, frame);
 
   drawFog(ctx, frame);
+  atmo?.drawRim(ctx, frame.view);
 }
 
 export const TICKS_PER_SEC = TICKS_PER_SECOND;

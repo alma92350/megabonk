@@ -47,3 +47,13 @@ export function contrastRatio(a: string, b: string): number {
   const la = luminance(a), lb = luminance(b);
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
+
+/** HSL saturation 0..1. */
+export function saturationOf(hex: string): number {
+  const { r, g, b } = parseHex(hex);
+  const max = Math.max(r, g, b) / 255, min = Math.min(r, g, b) / 255;
+  const d = max - min;
+  if (d === 0) return 0;
+  const l = (max + min) / 2;
+  return d / (1 - Math.abs(2 * l - 1));
+}

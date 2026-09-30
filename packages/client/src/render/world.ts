@@ -30,6 +30,7 @@ import {
   enemyVisual,
   font,
 } from './theme.js';
+import type { FxManager } from './fx/manager.js';
 import { pathContactShadow } from './shapes.js';
 import { animFrame, creatureCache, drawCreature, drawHero, facingFor } from './creatures/index.js';
 import {
@@ -56,6 +57,8 @@ export interface WorldFrame {
   readonly time: number;
   /** prefers-reduced-motion: damps pulses, bobs and twinkles in props. */
   readonly reduceMotion?: boolean;
+  /** Combat effects (spawned per tick by the client, aged per frame here). */
+  readonly fx?: FxManager;
 }
 
 /** A ranged enemy holds a standoff instead of swarming, so it must look different. */
@@ -343,14 +346,26 @@ function drawEnemy(ctx: Ctx2D, frame: WorldFrame, index: number, wx: number, wy:
 
   // Stagger doubles as the hit flash: the sim already tells us it was just hit.
   // A dying creature is a white flash that fades out.
-  drawCreature(ctx, creatureCache, visual, step, dying || e.stagger > 0, x, y, unit, face < 0, swell);
+  const kick = !dying && frame.fx !== undefined ? frame.fx.kickFor(e.id) : -1;
+  if (kick >= 0) {
+    // A ~130 ms squash and shove away from the blow, display-only.
+    const fx = frame.fx!;
+    const k = fx.kickAmount(kick);
+    ctx.save();
+    ctx.translate(x + fx.kickDirX(kick) * unit * 0.35 * k, y + fx.kickDirY(kick) * unit * 0.2 * k);
+    ctx.scale(1 + 0.16 * k, 1 - 0.14 * k);
+    drawCreature(ctx, creatureCache, visual, step, true, 0, 0, unit, face < 0, swell);
+    ctx.restore();
+  } else {
+    drawCreature(ctx, creatureCache, visual, step, dying || e.stagger > 0, x, y, unit, face < 0, swell);
+  }
   if (dying) {
     ctx.globalAlpha = 1;
     return;
   }
 
-  if (e.isBoss) drawBossPip(ctx, frame, index, x, y, unit * visual.height / 2.4);
-  else if (e.hp < e.maxHp) {
+  // The boss's health lives in the top banner only (a second overhead bar duplicated it).
+  if (!e.isBoss && e.hp < e.maxHp) {
     drawTinyBar(ctx, x, y - unit * visual.height - 5, Math.max(9, unit * 1.15), e.hp / e.maxHp);
   }
 }
@@ -366,27 +381,6 @@ function drawTinyBar(ctx: Ctx2D, cx: number, y: number, halfWidth: number, frac:
   ctx.fillRect(cx - halfWidth, y, w * Math.max(0, Math.min(1, frac)), h);
 }
 
-/** FR-27: bosses, and only bosses, get an exact numeric readout in-world. */
-function drawBossPip(
-  ctx: Ctx2D, frame: WorldFrame, index: number, x: number, y: number, r: number,
-): void {
-  const e = frame.state.enemies[index];
-  if (e === undefined) return;
-  const w = Math.min(r * 2.2, 320);
-  const h = Math.max(6, Math.min(14, r * 0.1));
-  const top = y - r * 2.5;
-  ctx.fillStyle = THEME.hpBack;
-  ctx.fillRect(x - w / 2, top, w, h);
-  ctx.fillStyle = THEME.boss;
-  ctx.fillRect(x - w / 2, top, w * Math.max(0, Math.min(1, e.hp / e.maxHp)), h);
-  ctx.strokeStyle = THEME.ink;
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(x - w / 2, top, w, h);
-  // No numeric readout here. The HUD's boss bar already shows the exact figure,
-  // and this one floats above a 2.6x boss, so near the top of the screen the two
-  // stacked and the world copy was clipped under the HUD's ("966/1100").
-}
-
 /** The hero's last horizontal facing: holds while they stand still or move vertically. */
 let heroFace = 1;
 
@@ -394,7 +388,7 @@ function drawPlayer(ctx: Ctx2D, frame: WorldFrame, wx: number, wy: number, hurt:
   const { state, prev, cam, view, palette, time } = frame;
   const x = projectX(wx, cam, view);
   const y = projectY(wy, 0, cam, view);
-  const unit = 0.6 * cam.zoom;
+  const unit = 0.67 * cam.zoom;
 
   // Pickup radius ring: the single most useful piece of positional information
   // in the genre, and it doubles as the player's ground anchor.
@@ -412,10 +406,9 @@ function drawPlayer(ctx: Ctx2D, frame: WorldFrame, wx: number, wy: number, hurt:
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // The hero's own soft halo: a warm gold pool at their feet, so they are the
-  // brightest, warmest thing on screen.
-  ctx.fillStyle = '#ffd166';
-  ctx.globalAlpha = 0.24;
+  // The hero's own lamp-light pool at their feet, in the signature chartreuse.
+  ctx.fillStyle = '#d4ffa0';
+  ctx.globalAlpha = 0.2;
   ctx.beginPath();
   ctx.ellipse(x, y, unit * 2.1, unit * 2.1 * Y_SQUASH, 0, 0, Math.PI * 2);
   ctx.fill();
@@ -443,6 +436,17 @@ function drawPlayer(ctx: Ctx2D, frame: WorldFrame, wx: number, wy: number, hurt:
   // Standing still: a slow breath (a 1 px rise), and the legs together.
   const step = moving ? animFrame(time, 0, 95, reduce) : 0;
   const breathe = moving || reduce ? 0 : Math.sin(time * 0.004) * unit * 0.04;
+  if (invuln) {
+    // A ring that swells outward while the hero is invulnerable after a hit: a hit read that is not just colour.
+    const pulse = (time % 400) / 400;
+    ctx.strokeStyle = '#fff6d6';
+    ctx.globalAlpha = (1 - pulse) * 0.7;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.ellipse(x, y, unit * (1.3 + pulse * 1.4), unit * (1.3 + pulse * 1.4) * Y_SQUASH, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = blink ? 0.55 : 1;
+  }
   drawHero(ctx, creatureCache, step, hurt > 0.2 ? 2 : 0, x, y + breathe, unit, heroFace < 0);
   ctx.globalAlpha = 1;
 
@@ -481,6 +485,9 @@ export function drawWorld(ctx: Ctx2D, frame: WorldFrame, hurt: number): void {
       default: break;
     }
   }
+
+  // Combat feedback sits above every actor and below fog and the HUD.
+  frame.fx?.draw(ctx, frame);
 
   drawFog(ctx, frame);
 }

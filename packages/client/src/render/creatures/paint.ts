@@ -72,7 +72,7 @@ export function palFor(v: EnemyVisual, variant: 0 | 1): Pal {
         }
       : {
           body: v.body, shade: v.shade, light: v.light, rim: v.rim, accent: v.accent, dark: v.dark,
-          white: '#fffdf4', pupil: '#120c1a', glow: v.ranged ? RANGED_GLOW : '#ffe14a', ink: INK,
+          white: '#fffdf4', pupil: '#120c1a', glow: v.ranged ? RANGED_GLOW : '#ff8a2a', ink: INK,
           accentShade: mix(v.accent, '#000000', 0.32),
         };
     palCache.set(key, p);
@@ -85,9 +85,13 @@ function ellPath(c: Ctx2D, x: number, y: number, rx: number, ry: number, rot: nu
   c.ellipse(x, y, Math.max(0.001, rx), Math.max(0.001, ry), rot, 0, TAU);
 }
 
+let outlineScale = 1;
+/** Fatten every outline (used for the hero's light rim pass). */
+export function setOutlineScale(k: number): void { outlineScale = k; }
+
 function outline(c: Ctx2D, ink: string, w = LW): void {
   c.strokeStyle = ink;
-  c.lineWidth = w;
+  c.lineWidth = w * outlineScale;
   c.lineJoin = 'round';
   c.lineCap = 'round';
   c.stroke();
@@ -175,7 +179,7 @@ export function line(
 ): void {
   trace(c, pts, false);
   c.strokeStyle = colour;
-  c.lineWidth = w;
+  c.lineWidth = w + (outlineScale - 1) * LW;
   c.lineJoin = 'round';
   c.lineCap = 'round';
   c.stroke();

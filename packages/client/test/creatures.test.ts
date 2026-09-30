@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { enemies } from '@megabonk/content';
 import { SpriteCache, type Surface } from '../src/render/atlas.js';
 import { FRAMES, animFrame, facingFor, phaseOf, resolveFacing } from '../src/render/creatures/anim.js';
-import { contrastRatio, hueDistance, hueOf } from '../src/render/creatures/color.js';
+import { contrastRatio, hueDistance, hueOf, luminance, saturationOf } from '../src/render/creatures/color.js';
 import {
+  BLUE_HUE_MAX, BLUE_HUE_MIN, GOLD_HUE_MAX, GOLD_HUE_MIN, SATURATED,
   ENEMY_VISUALS, MOSS_HUE_MAX, MOSS_HUE_MIN, RANGED_GLOW, enemyVisual, hasEnemyVisual,
   isFallbackVisual, type EnemyVisual,
 } from '../src/render/creatures/visuals.js';
@@ -11,6 +12,8 @@ import {
   creatureKey, drawCreature, drawHero, heroKey, HERO_VARIANTS,
 } from '../src/render/creatures/sprites.js';
 import { PROJECTILE_CORE } from '../src/render/theme.js';
+import { HERO_RIM, HERO_SIGNATURE } from '../src/render/creatures/hero.js';
+import { CHEST_GLOW, MERCHANT_GLOW, PICKUP_VISUALS, SHRINE_TINTS } from '../src/render/props/palette.js';
 import { drawFrame } from '../src/render/renderer.js';
 import { GameClient } from '../src/app.js';
 import { fakeCtx } from './fake-ctx.js';
@@ -46,28 +49,82 @@ describe('roster coverage', () => {
 });
 
 describe('distinct silhouette + colour family', () => {
-  it('every pair differs in shape, and in hue (>= 20 deg) or achromatic tone or footprint', () => {
+  const lightness = (hex: string): number => luminance(hex);
+  it('every pair differs by at least two of: silhouette, hue, value, size', () => {
     for (let i = 0; i < KINDS.length; i++) {
       for (let j = i + 1; j < KINDS.length; j++) {
-        const a = visualOf(KINDS[i]!), b = visualOf(KINDS[j]!);
-        expect(a.shape, `${a.id}/${b.id} shape`).not.toBe(b.shape);
+        const A = KINDS[i]!, B = KINDS[j]!;
+        const a = visualOf(A), b = visualOf(B);
         const ha = hueOf(a.body), hb = hueOf(b.body);
-        let colourApart: boolean;
-        if (ha < 0 || hb < 0) colourApart = ha !== hb || Math.abs(a.scale - b.scale) > 0.1;
-        else colourApart = hueDistance(ha, hb) >= 20;
-        const sizeApart = Math.abs(footprint(KINDS[i]!) - footprint(KINDS[j]!)) / Math.max(footprint(KINDS[i]!), footprint(KINDS[j]!)) >= 0.15;
-        expect(colourApart || sizeApart, `${a.id}/${b.id} colour or size`).toBe(true);
+        const cues = [
+          a.shape !== b.shape,
+          (ha < 0) !== (hb < 0) || (ha >= 0 && hb >= 0 && hueDistance(ha, hb) >= 20),
+          Math.abs(lightness(a.body) - lightness(b.body)) >= 0.04,
+          Math.abs(footprint(A) - footprint(B)) / Math.max(footprint(A), footprint(B)) >= 0.15,
+        ].filter(Boolean).length;
+        expect(cues, `${A}/${B}`).toBeGreaterThanOrEqual(2);
+        expect(a.shape, `${A}/${B} silhouette`).not.toBe(b.shape);
       }
     }
   });
+});
 
-  it('hues are spread: no two chromatic bodies closer than 15 degrees', () => {
-    const hues = KINDS.map((k) => ({ k, h: hueOf(visualOf(k).body) })).filter((x) => x.h >= 0);
-    for (let i = 0; i < hues.length; i++) {
-      for (let j = i + 1; j < hues.length; j++) {
-        expect(hueDistance(hues[i]!.h, hues[j]!.h), `${hues[i]!.k}/${hues[j]!.k}`).toBeGreaterThanOrEqual(15);
-      }
+describe('the meaning scheme: a colour means one thing', () => {
+  const bodies = (): EnemyVisual[] => [...KINDS.map(visualOf), enemyVisual('x'), enemyVisual('x', true)];
+  const chromatic = (c: string): boolean => hueOf(c) >= 0;
+  const saturated = (c: string): boolean => chromatic(c) && saturationOf(c) >= SATURATED;
+
+  it('no creature body sits in the blue/cyan band (that is XP, rare, fleetfoot: friendly)', () => {
+    for (const v of bodies()) {
+      const h = hueOf(v.body);
+      if (h < 0) continue;
+      expect(h < BLUE_HUE_MIN || h > BLUE_HUE_MAX, `${v.id} hue ${h.toFixed(0)}`).toBe(true);
     }
+  });
+
+  it('no saturated creature body reads as gold / reward', () => {
+    for (const v of bodies()) {
+      if (!saturated(v.body)) continue;
+      const h = hueOf(v.body);
+      expect(h < GOLD_HUE_MIN || h > GOLD_HUE_MAX, `${v.id} hue ${h.toFixed(0)}`).toBe(true);
+    }
+  });
+
+  it('no saturated creature body is in the pink (incoming damage) arc', () => {
+    for (const v of bodies()) {
+      if (!saturated(v.body)) continue;
+      expect(hueDistance(hueOf(v.body), hueOf(PROJECTILE_CORE)), v.id).toBeGreaterThanOrEqual(40);
+    }
+  });
+
+  it('bodies are clay/mud, plum, iron grey or bone: low or violet saturation', () => {
+    for (const v of bodies()) {
+      const h = hueOf(v.body);
+      const purple = h >= 255 && h <= 306;
+      expect(!saturated(v.body) || purple, v.id).toBe(true);
+    }
+  });
+});
+
+describe('the hero owns a colour nothing else uses', () => {
+  const heroHue = hueOf(HERO_SIGNATURE);
+  it('is at least 35 degrees from every creature, pickup, shrine and the projectile', () => {
+    const others: string[] = [PROJECTILE_CORE, CHEST_GLOW, MERCHANT_GLOW];
+    for (const k of KINDS) for (const c of [visualOf(k).body, visualOf(k).accent]) if (hueOf(c) >= 0 && saturationOf(c) > 0.3) others.push(c);
+    for (const p of Object.values(PICKUP_VISUALS)) others.push(p.core, p.glow);
+    for (const t of Object.values(SHRINE_TINTS)) others.push(t.color);
+    for (const c of others) {
+      expect(hueDistance(heroHue, hueOf(c)), c).toBeGreaterThanOrEqual(35);
+    }
+  });
+
+  it('is vivid enough to find in a crowd, and contrasts with the ground', () => {
+    expect(saturationOf(HERO_SIGNATURE)).toBeGreaterThan(0.7);
+    expect(contrastRatio(HERO_SIGNATURE, GROUND)).toBeGreaterThan(8);
+  });
+
+  it('has a light rim colour that no creature outline uses', () => {
+    for (const k of KINDS) expect(visualOf(k).rim.toLowerCase()).not.toBe(HERO_RIM);
   });
 });
 
@@ -101,13 +158,6 @@ describe('ranged cue', () => {
     expect(hueDistance(hueOf(RANGED_GLOW), hueOf(PROJECTILE_CORE))).toBeGreaterThanOrEqual(30);
   });
 
-  it('no creature BODY hue is within 40 degrees of the projectile hue', () => {
-    for (const v of [...KINDS.map(visualOf), enemyVisual('x'), enemyVisual('x', true)]) {
-      const h = hueOf(v.body);
-      if (h < 0) continue;
-      expect(hueDistance(h, hueOf(PROJECTILE_CORE)), v.id).toBeGreaterThanOrEqual(40);
-    }
-  });
 });
 
 describe('size hierarchy', () => {

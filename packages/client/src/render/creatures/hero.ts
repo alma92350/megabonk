@@ -4,13 +4,19 @@
  * makes the facing readable even in a crowd.
  */
 
-import { INK, LW, dot, ell, eye, flat, limb, poly, mix, type Pal, type Pose } from './paint.js';
+import { INK, LW, dot, ell, eye, flat, limb, poly, mix, setOutlineScale, type Pal, type Pose } from './paint.js';
+
+/** The hero's signature: a saturated chartreuse no creature, pickup or shot uses. */
+export const HERO_SIGNATURE = '#9ff03a';
+export const HERO_RIM = '#fff6d6';
+let haloMode = false;
 
 export const HERO_VARIANTS = 3;
 /** 0 = normal, 1 = white hit flash, 2 = hurt (red-tinted). */
 const heroPals: Pal[] = [];
 
 function tint(v: 0 | 1 | 2, c: string): string {
+  if (haloMode) return HERO_RIM;
   if (v === 1) return mix(c, '#ffffff', 0.85);
   if (v === 2) return mix(c, '#ff5040', 0.42);
   return c;
@@ -21,7 +27,7 @@ export function heroPal(v: 0 | 1 | 2): Pal {
   if (p === undefined) {
     p = {
       body: tint(v, '#fff0d2'), shade: tint(v, '#d9b98a'), light: '#ffffff',
-      rim: tint(v, '#fff6e0'), accent: tint(v, '#ffcf3a'), accentShade: tint(v, '#d98a10'),
+      rim: tint(v, '#fff6e0'), accent: tint(v, HERO_SIGNATURE), accentShade: tint(v, '#5f9a14'),
       dark: tint(v, '#4a2f1e'), white: '#ffffff', pupil: '#2a1a12', glow: '#ffe14a', ink: INK,
     };
     heroPals[v] = p;
@@ -29,11 +35,31 @@ export function heroPal(v: 0 | 1 | 2): Pal {
   return p;
 }
 
+const haloPals: Pal[] = [];
+function haloPal(v: 0 | 1 | 2): Pal {
+  let p = haloPals[v];
+  if (p === undefined) {
+    p = { body: HERO_RIM, shade: HERO_RIM, light: HERO_RIM, rim: HERO_RIM, accent: HERO_RIM, accentShade: HERO_RIM, dark: HERO_RIM, white: HERO_RIM, pupil: HERO_RIM, glow: HERO_RIM, ink: HERO_RIM };
+    haloPals[v] = p;
+  }
+  return p;
+}
+
+/** Two passes: a fattened light silhouette (the rim only the hero has), then the hero. */
 export function paintHero(P: Pose, v: 0 | 1 | 2): void {
+  haloMode = true;
+  setOutlineScale(2.6);
+  paintHeroBody({ ...P, p: haloPal(v) }, v);
+  haloMode = false;
+  setOutlineScale(1);
+  paintHeroBody(P, v);
+}
+
+function paintHeroBody(P: Pose, v: 0 | 1 | 2): void {
   const { c, p, s, k, bounce } = P;
   const lift = -bounce * 0.09;
   const skin = tint(v, '#ffd6b0'), skinShade = tint(v, '#e0a37a');
-  const hair = tint(v, '#ffc02e'), hairShade = tint(v, '#d98f10');
+  const hair = tint(v, HERO_SIGNATURE), hairShade = tint(v, '#5f9a14');
   const wood = tint(v, '#a4693a'), woodShade = tint(v, '#6d4222');
 
   // scarf tail, streaming behind and rippling with the step cycle
@@ -41,7 +67,7 @@ export function paintHero(P: Pose, v: 0 | 1 | 2): void {
     P,
     [-0.3, -1.95 + lift, -1.1, -2.0 + lift + s * 0.1, -1.9, -2.25 + lift + s * 0.3, -2.55, -1.75 + lift + s * 0.4,
       -2.0, -1.6 + lift + s * 0.3, -1.1, -1.65 + lift + s * 0.1, -0.3, -1.6 + lift],
-    p.accent, p.accentShade, '#fff2a8',
+    p.accent, p.accentShade, tint(v, '#d4ff8a'),
   );
   // boots and legs
   limb(P, [-0.28, -0.85, -0.28 + s * 0.4, -0.16], 0.3, p.dark);
@@ -56,9 +82,9 @@ export function paintHero(P: Pose, v: 0 | 1 | 2): void {
   dot(P, 0.05, -0.99 + lift, 0.16, 0.13, p.accent);
   // head
   ell(P, 0.1, -2.42 + lift, 0.84, 0.78, skin, skinShade, tint(v, '#fff0dc'));
-  ell(P, 0.0, -2.98 + lift, 0.78, 0.36, hair, hairShade, tint(v, '#ffe58a'));
-  poly(P, [-0.62, -2.9 + lift, -0.95, -2.55 + lift, -0.55, -2.4 + lift], hair, hairShade, tint(v, '#ffe58a'));
-  poly(P, [0.35, -3.2 + lift, 0.6, -3.65 + lift, 0.8, -3.1 + lift], hair, hairShade, tint(v, '#ffe58a'));
+  ell(P, 0.0, -2.98 + lift, 0.78, 0.36, hair, hairShade, tint(v, '#d4ff8a'));
+  poly(P, [-0.62, -2.9 + lift, -0.95, -2.55 + lift, -0.55, -2.4 + lift], hair, hairShade, tint(v, '#d4ff8a'));
+  poly(P, [0.35, -3.2 + lift, 0.6, -3.65 + lift, 0.8, -3.1 + lift], hair, hairShade, tint(v, '#d4ff8a'));
   eye(P, -0.04, -2.4 + lift, 0.24, { lx: 0.7, ly: 0.05 });
   eye(P, 0.62, -2.4 + lift, 0.24, { lx: 0.7, ly: 0.05 });
   c.globalAlpha = 0.5;

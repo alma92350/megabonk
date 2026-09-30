@@ -50,31 +50,31 @@ function v(
 
 export const ENEMY_VISUALS: Readonly<Record<string, EnemyVisual>> = Object.freeze({
   // fodder swarm: rose-pink goblin
-  grunt: v('grunt', 'goblin', '#3b46e3', '#252c93', '#949bf9', '#bdc1ff', '#8a5a3a', '#3a1424', 1.35, false, 2.5, 130),
+  grunt: v('grunt', 'goblin', '#7d5a3c', '#513b29', '#caac91', '#e4d4c6', '#8a5a3a', '#3a1424', 1.35, false, 2.5, 95),
   // fast chaser: amber fox
-  runner: v('runner', 'fox', '#e3843b', '#935425', '#f9c094', '#ffd9bd', '#fff2dc', '#3a1c0c', 1.5, false, 2.1, 90),
+  runner: v('runner', 'fox', '#d2b89c', '#a47a4e', '#e8dcce', '#f3ede5', '#fff2dc', '#3a1c0c', 1.5, false, 2.1, 90),
   // insect swarm: cyan beetle
-  swarmling: v('swarmling', 'bug', '#3bc1e3', '#257d93', '#94e5f9', '#bdf2ff', '#e8fdff', '#0c3040', 1.55, false, 2.0, 70),
+  swarmling: v('swarmling', 'bug', '#e2dabb', '#b6a35b', '#f0ecdd', '#f7f5ed', '#fffbe8', '#0c3040', 1.55, false, 2.0, 70),
   // heavy bruiser: red tusked ogre
-  brute: v('brute', 'ogre', '#e3c13b', '#937d25', '#f9e594', '#fff2bd', '#f1e6c8', '#3a0c0c', 1.2, false, 3.0, 190),
+  brute: v('brute', 'ogre', '#8a3aa0', '#5a2868', '#c994d8', '#e3c7eb', '#f1e6c8', '#3a0c0c', 1.2, false, 3.0, 190),
   // fast tough flanker: indigo wolf
-  stalker: v('stalker', 'wolf', '#3be3d5', '#25938a', '#94f9f1', '#bdfff9', '#e9edff', '#141a55', 1.6, false, 2.0, 100),
+  stalker: v('stalker', 'wolf', '#6c6a74', '#47464c', '#b5b4ba', '#d9d8db', '#ece8f0', '#141a55', 1.6, false, 2.0, 100),
   // ranged harasser: orchid hooded imp with a raised orb
-  lobber: v('lobber', 'imp', '#bc44e4', '#772593', '#e094f9', '#eebdff', '#ffb4ff', '#2a0c48', 1.3, true, 2.7, 140),
+  lobber: v('lobber', 'imp', '#c48ae0', '#8e36b9', '#e2c4f0', '#f0e1f7', '#ffb4ff', '#2a0c48', 1.3, true, 2.7, 140),
   // ranged sniper: tall purple robed one-eyed seer
-  seer: v('seer', 'seer', '#6f40dd', '#462593', '#b394f9', '#d1bdff', '#ffb4ff', '#1e0c4a', 1.35, true, 3.6, 170),
+  seer: v('seer', 'seer', '#6a48b0', '#473172', '#b4a2d9', '#d8cfeb', '#ffb4ff', '#1e0c4a', 1.35, true, 3.6, 170),
   // armoured tank: grey stone golem with lava runes
-  tank: v('tank', 'golem', '#a6a6b2', '#646470', '#dedee8', '#f0f0f8', '#ff9a3c', '#2a2838', 1.2, false, 2.7, 220),
+  tank: v('tank', 'golem', '#a6a6b2', '#6a6a79', '#d3d3d8', '#e8e8eb', '#ff9a3c', '#2a2838', 1.2, false, 2.7, 220),
   // boss: plum armoured guardian with gold antlers
-  warden: v('warden', 'warden', '#ae32a8', '#93258d', '#f994f4', '#ffbdfc', '#ffc94a', '#2a0620', 1.0, false, 4.9, 240),
+  warden: v('warden', 'warden', '#8c4a94', '#5b3260', '#ca9fcf', '#e3cde6', '#e8dcc0', '#2a0620', 1.0, false, 4.9, 240),
 });
 
 const FALLBACK_ENEMY: EnemyVisual = Object.freeze(
-  v('generic', 'generic', '#4b9ad2', '#256593', '#94cff9', '#bde3ff', '#f0e2c0', '#30101e', 1.2, false, 2.4, 140),
+  v('generic', 'generic', '#a8806a', '#715444', '#d3bfb4', '#e8ded8', '#f0e2c0', '#30101e', 1.2, false, 2.4, 140),
 );
 
 const FALLBACK_RANGED: EnemyVisual = Object.freeze(
-  v('genericRanged', 'genericRanged', '#b070f0', '#7a3fb8', '#dcb4ff', '#eed6ff', '#ffb4ff', '#22103e', 1.2, true, 2.6, 140),
+  v('genericRanged', 'genericRanged', '#b070d0', '#7a379c', '#d8b8e8', '#eadaf3', '#ffb4ff', '#22103e', 1.2, true, 2.6, 140),
 );
 
 /** True when `kind` has its own designed creature (not the generic fallback). */
@@ -100,3 +100,19 @@ export function isFallbackVisual(visual: EnemyVisual): boolean {
 /** The ground's moss-green hue band (degrees); no hostile body may sit in it. */
 export const MOSS_HUE_MIN = 60;
 export const MOSS_HUE_MAX = 165;
+
+/**
+ * THE MEANING SCHEME. A colour means one thing:
+ *  - blue / cyan (170-255 deg)  = friendly, yours: XP gems, rare, the fleetfoot shrine;
+ *  - saturated gold / yellow (25-60 deg) = reward: coins, chests, avarice;
+ *  - hot pink (the projectile hue +-40 deg) = incoming damage;
+ *  - moss green (60-165 deg) = the ground.
+ * Hostile bodies live in clay / mud browns, bruise purples, iron grey and bone, so a
+ * body is only allowed inside those bands when it is desaturated
+ * (saturation < SATURATED).
+ */
+export const BLUE_HUE_MIN = 170;
+export const BLUE_HUE_MAX = 255;
+export const GOLD_HUE_MIN = 25;
+export const GOLD_HUE_MAX = 60;
+export const SATURATED = 0.45;

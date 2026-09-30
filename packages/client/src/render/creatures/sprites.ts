@@ -130,7 +130,7 @@ export function drawCreature(
 
 // ---- hero -----------------------------------------------------------------
 
-const HERO_BOX: Box = { x0: -2.8, x1: 2.6, y0: -3.8, y1: 0.35 };
+const HERO_BOX: Box = { x0: -2.95, x1: 2.75, y0: -3.95, y1: 0.5 };
 const heroSets = new Map<number, SpriteSet>();
 
 function heroSet(unit: number): SpriteSet {

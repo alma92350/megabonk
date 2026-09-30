@@ -95,7 +95,38 @@ export async function startBridge(options: BridgeOptions = {}): Promise<BridgeHa
   const screen = empty<unknown>();
 
   const server = createServer((req, res) => {
-    void handle(req, res);
+    // A request that dies in flight must never take the bridge with it.
+    //
+    // The browser aborts in-flight POSTs on every reload or navigation, and the
+    // page publishes at ~10 Hz, so there is nearly always one in flight. An
+    // aborted body makes `for await (const chunk of req)` throw inside
+    // readJson; with the rejection discarded (`void handle(...)`) that became an
+    // unhandled rejection, which Node turns into a process exit. That is not
+    // theoretical — it killed a live bridge mid-run at 11:49.
+    handle(req, res).catch((err: unknown) => {
+      const code = (err as { code?: string } | null)?.code;
+      // ECONNRESET / 'aborted' are the client hanging up: normal, not a fault.
+      if (code !== 'ECONNRESET' && String(err) !== 'Error: aborted') {
+        process.stderr.write(`[hollowlight] bridge request failed: ${String(err)}\n`);
+      }
+      if (!res.headersSent) {
+        try {
+          res.writeHead(500, { 'content-type': 'application/json' });
+          res.end('{"error":"request failed"}');
+        } catch {
+          /* socket already gone — nothing to report to */
+        }
+      } else {
+        res.destroy();
+      }
+    });
+    // Socket-level errors arrive as 'error' events, which are ALSO fatal when
+    // unhandled, by the same route.
+    req.on('error', () => {});
+    res.on('error', () => {});
+  });
+  server.on('clientError', (_err, socket) => {
+    socket.destroy();
   });
 
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {

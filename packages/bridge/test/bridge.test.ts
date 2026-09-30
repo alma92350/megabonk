@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
+import { connect } from 'node:net';
 import { startBridge, type BridgeHandle } from '../src/server.js';
 
 let handle: BridgeHandle | null = null;
@@ -149,6 +150,41 @@ describe('the co-play bridge', () => {
 
     await post(url, '/screen', { screen: 'run' });
     expect((await (await fetch(`${url}/health`)).json()).screen).toBe('run');
+  });
+
+  it('survives a client that hangs up mid-body, instead of dying on it', async () => {
+    // The page aborts in-flight POSTs on every reload, and it publishes at
+    // ~10 Hz, so there is almost always one in flight. Before this was handled,
+    // the aborted body threw inside readJson, the rejection was discarded, and
+    // Node killed the bridge process — it took out a live bridge at 11:49 into
+    // a run. Any unhandled rejection here fails this test.
+    const rejections: unknown[] = [];
+    const onRejection = (err: unknown): void => void rejections.push(err);
+    process.on('unhandledRejection', onRejection);
+    try {
+      handle = await startBridge({ port: 0 });
+      await new Promise<void>((resolve) => {
+        const sock = connect(handle!.port, '127.0.0.1', () => {
+          // Promise 5000 bytes of body, send a fragment, then hang up.
+          sock.write(
+            'POST /state HTTP/1.1\r\nHost: x\r\ncontent-type: application/json\r\n' +
+              'content-length: 5000\r\n\r\n{"snapshot":{"a":1',
+          );
+          setTimeout(() => {
+            sock.destroy();
+            resolve();
+          }, 50);
+        });
+        sock.on('error', () => resolve());
+      });
+      await new Promise((r) => setTimeout(r, 150));
+      // Still serving.
+      const res = await fetch(`http://127.0.0.1:${handle.port}/health`);
+      expect(res.status).toBe(200);
+      expect(rejections).toEqual([]);
+    } finally {
+      process.off('unhandledRejection', onRejection);
+    }
   });
 
   it('close() releases the port so a restart is immediate', async () => {

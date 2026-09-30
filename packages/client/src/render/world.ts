@@ -25,15 +25,17 @@ import {
 } from './projection.js';
 import { SpriteBuffer } from './sort.js';
 import {
-  PICKUP_COLORS,
   PROJECTILE_CORE,
-  PROJECTILE_HEAD,
-  PROJECTILE_TRAIL,
   THEME,
   enemyVisual,
   font,
 } from './theme.js';
-import { pathContactShadow, pathEnemy } from './shapes.js';
+import { pathContactShadow } from './shapes.js';
+import { animFrame, creatureCache, drawCreature, drawHero, facingFor } from './creatures/index.js';
+import {
+  drawBeacons, drawGroundDecor, drawInteractableProp, drawMerchantProp, drawObstacleProp,
+  drawPickupProp, drawProjectileProp,
+} from './props/index.js';
 
 /** One buffer for the life of the page: the draw loop must not allocate. */
 const sprites = new SpriteBuffer();
@@ -52,6 +54,8 @@ export interface WorldFrame {
   readonly palette: BiomePalette;
   readonly content: ContentBundle;
   readonly time: number;
+  /** prefers-reduced-motion: damps pulses, bobs and twinkles in props. */
+  readonly reduceMotion?: boolean;
 }
 
 /** A ranged enemy holds a standoff instead of swarming, so it must look different. */
@@ -136,6 +140,7 @@ export function drawGround(ctx: Ctx2D, frame: WorldFrame): void {
   const farCam: Camera = { x: cam.x * 0.88, y: cam.y * 0.88, zoom: cam.zoom };
   drawLattice(ctx, farCam, view, half * 1.3, 9, palette.groundAlt, 3);
   drawLattice(ctx, cam, view, half, 3, palette.groundAlt, 1);
+  drawGroundDecor(ctx, cam, view, half);
 
   ctx.restore();
 
@@ -162,6 +167,8 @@ export function drawFog(ctx: Ctx2D, frame: WorldFrame): void {
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, view.width, view.height);
   ctx.globalAlpha = 1;
+  // Off-screen reward beacons sit above the fog so distance never dims them.
+  drawBeacons(ctx, frame.state, frame.cam, view, frame.time, frame.reduceMotion === true);
 }
 
 // ---- the sorted pass ------------------------------------------------------
@@ -267,291 +274,92 @@ function drawShadows(ctx: Ctx2D, frame: WorldFrame, buffer: SpriteBuffer): void 
 function drawObstacle(ctx: Ctx2D, frame: WorldFrame, index: number): void {
   const o = frame.state.map.obstacles[index];
   if (o === undefined) return;
-  const { cam, view, palette } = frame;
-  const x = projectX(o.pos.x, cam, view);
-  const baseY = projectY(o.pos.y, 0, cam, view);
-  const topY = projectY(o.pos.y, o.height, cam, view);
-  const rx = o.radius * cam.zoom;
-  const ry = rx * Y_SQUASH;
-
-  // Extruded side wall: two verticals plus the base arc. Darker than the cap, so
-  // the height reads without any lighting model.
-  ctx.fillStyle = palette.fog;
-  ctx.beginPath();
-  ctx.moveTo(x - rx, topY);
-  ctx.lineTo(x - rx, baseY);
-  ctx.ellipse(x, baseY, rx, ry, 0, Math.PI, 0, true);
-  ctx.lineTo(x + rx, topY);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.fillStyle = palette.obstacle;
-  ctx.beginPath();
-  ctx.ellipse(x, topY, rx, ry, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.strokeStyle = THEME.ink;
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  // Rim light along the top-left, the single global light direction.
-  ctx.strokeStyle = palette.accent;
-  ctx.globalAlpha = 0.28;
-  ctx.beginPath();
-  ctx.ellipse(x, topY, rx * 0.92, ry * 0.92, 0, Math.PI * 1.05, Math.PI * 1.85);
-  ctx.stroke();
-  ctx.globalAlpha = 1;
+  const { cam, view } = frame;
+  drawObstacleProp(ctx, o, projectX(o.pos.x, cam, view), projectY(o.pos.y, 0, cam, view), cam.zoom);
 }
 
 function drawPickup(ctx: Ctx2D, frame: WorldFrame, index: number): void {
   const p = frame.state.pickups[index];
   if (p === undefined) return;
-  const { cam, view, time } = frame;
-  const x = projectX(p.pos.x, cam, view);
-  const bob = Math.sin(time * 0.004 + p.id) * 0.12;
-  const y = projectY(p.pos.y, 0.25 + bob, cam, view);
-  const r = (p.kind === 'xp' ? 0.2 : 0.24) * cam.zoom;
-
-  ctx.fillStyle = PICKUP_COLORS[p.kind];
-  ctx.beginPath();
-  if (p.kind === 'xp') {
-    ctx.moveTo(x, y - r);
-    ctx.lineTo(x + r * 0.8, y);
-    ctx.lineTo(x, y + r);
-    ctx.lineTo(x - r * 0.8, y);
-    ctx.closePath();
-  } else if (p.kind === 'gold') {
-    ctx.ellipse(x, y, r, r * 0.78, 0, 0, Math.PI * 2);
-  } else {
-    ctx.rect(x - r * 0.32, y - r, r * 0.64, r * 2);
-    ctx.rect(x - r, y - r * 0.32, r * 2, r * 0.64);
-  }
-  ctx.fill();
+  const { cam, view } = frame;
+  drawPickupProp(
+    ctx, p, projectX(p.pos.x, cam, view), projectY(p.pos.y, 0, cam, view), cam.zoom,
+    frame.time, frame.reduceMotion === true,
+  );
 }
 
 function drawInteractable(ctx: Ctx2D, frame: WorldFrame, index: number): void {
   const it = frame.state.interactables[index];
   if (it === undefined) return;
-  const { cam, view, time } = frame;
-  const x = projectX(it.pos.x, cam, view);
-  const groundY = projectY(it.pos.y, 0, cam, view);
-  const u = cam.zoom;
-  const spent = it.used;
-
-  if (it.kind === 'chest') {
-    // A hard-edged strongbox: lid, body, a bright clasp. Spent chests lose the
-    // clasp glow and the lid hangs open, so "already looted" reads at distance.
-    const w = 0.55 * u;
-    const h = 0.42 * u;
-    const top = groundY - h * 1.35;
-    ctx.fillStyle = spent ? '#2b2f2c' : '#5a4326';
-    ctx.beginPath();
-    ctx.rect(x - w, top, w * 2, h * 1.35);
-    ctx.fill();
-    ctx.fillStyle = spent ? '#3a4039' : THEME.gold;
-    ctx.globalAlpha = spent ? 0.7 : 1;
-    ctx.beginPath();
-    if (spent) {
-      // Open lid, tipped back.
-      ctx.moveTo(x - w, top);
-      ctx.lineTo(x - w * 0.75, top - h * 0.75);
-      ctx.lineTo(x + w * 1.1, top - h * 0.55);
-      ctx.lineTo(x + w, top);
-    } else {
-      ctx.moveTo(x - w, top);
-      ctx.quadraticCurveTo(x, top - h * 0.95, x + w, top);
-    }
-    ctx.closePath();
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle = THEME.ink;
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(x - w, top, w * 2, h * 1.35);
-    if (!spent) {
-      const pulse = 0.55 + 0.45 * Math.sin(time * 0.006);
-      ctx.fillStyle = THEME.crit;
-      ctx.globalAlpha = pulse;
-      ctx.beginPath();
-      ctx.rect(x - w * 0.14, top + h * 0.2, w * 0.28, h * 0.6);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-    }
-    return;
-  }
-
-  // Shrine: a standing monolith with a floating rune. Lit while usable, dark and
-  // cracked once spent.
-  const w = 0.34 * u;
-  const h = 1.5 * u;
-  ctx.fillStyle = spent ? '#242b28' : '#33403c';
-  ctx.beginPath();
-  ctx.moveTo(x - w, groundY);
-  ctx.lineTo(x - w * 0.72, groundY - h);
-  ctx.lineTo(x + w * 0.72, groundY - h);
-  ctx.lineTo(x + w, groundY);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = THEME.ink;
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  if (spent) {
-    ctx.strokeStyle = '#141a18';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(x - w * 0.5, groundY - h * 0.9);
-    ctx.lineTo(x + w * 0.2, groundY - h * 0.45);
-    ctx.lineTo(x - w * 0.3, groundY - h * 0.1);
-    ctx.stroke();
-    return;
-  }
-
-  const pulse = 0.5 + 0.5 * Math.sin(time * 0.0035 + it.id);
-  const runeY = groundY - h * 0.62;
-  ctx.fillStyle = THEME.advisor;
-  ctx.globalAlpha = 0.45 + 0.4 * pulse;
-  ctx.beginPath();
-  ctx.moveTo(x, runeY - w * 0.6);
-  ctx.lineTo(x + w * 0.5, runeY);
-  ctx.lineTo(x, runeY + w * 0.6);
-  ctx.lineTo(x - w * 0.5, runeY);
-  ctx.closePath();
-  ctx.fill();
-  ctx.globalAlpha = 1;
+  const { cam, view } = frame;
+  drawInteractableProp(
+    ctx, it, projectX(it.pos.x, cam, view), projectY(it.pos.y, 0, cam, view), cam.zoom,
+    frame.time, frame.reduceMotion === true,
+  );
 }
 
-/**
- * Enemy shots must be DODGEABLE, which makes telegraphing a fairness
- * requirement rather than decoration: a tracer oriented along `vel` shows both
- * where the shot is and where it is going, and a hot head makes the leading edge
- * unambiguous. Drawn in pink, which nothing else in the palette uses.
- */
+/** Enemy shots must be dodgeable: see props/projectiles.ts for the telegraphing. */
 function drawProjectile(ctx: Ctx2D, frame: WorldFrame, index: number, wx: number, wy: number): void {
   const q = frame.state.projectiles[index];
   if (q === undefined) return;
-  const { cam, view } = frame;
-  const x = projectX(wx, cam, view);
-  const y = projectY(wy, 0.4, cam, view);
-
-  // Streak covers ~110 ms of travel: long enough to read direction, short enough
-  // not to lie about where the hitbox is.
-  const tailX = projectX(wx - q.vel.x * 0.11, cam, view);
-  const tailY = projectY(wy - q.vel.y * 0.11, 0.4, cam, view);
-  const r = Math.max(2.5, q.radius * cam.zoom);
-
-  ctx.strokeStyle = PROJECTILE_TRAIL;
-  ctx.lineWidth = r * 1.8;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(tailX, tailY);
-  ctx.lineTo(x, y);
-  ctx.stroke();
-
-  ctx.strokeStyle = PROJECTILE_CORE;
-  ctx.lineWidth = r * 0.8;
-  ctx.beginPath();
-  ctx.moveTo(tailX, tailY);
-  ctx.lineTo(x, y);
-  ctx.stroke();
-  ctx.lineCap = 'butt';
-
-  ctx.fillStyle = PROJECTILE_HEAD;
-  ctx.beginPath();
-  ctx.arc(x, y, r * 0.65, 0, Math.PI * 2);
-  ctx.fill();
+  drawProjectileProp(ctx, q, frame.cam, frame.view, wx, wy, frame.time, frame.reduceMotion === true);
 }
 
 function drawMerchant(ctx: Ctx2D, frame: WorldFrame): void {
   const merchant = frame.state.merchant;
   if (merchant === null) return;
-  const { cam, view, time } = frame;
-  const x = projectX(merchant.pos.x, cam, view);
-  const y = projectY(merchant.pos.y, 0, cam, view);
-  const u = cam.zoom;
-
-  // Awning, counter, and a lantern that pulses so the player can find it.
-  ctx.fillStyle = '#3b2b1f';
-  ctx.beginPath();
-  ctx.rect(x - u * 0.9, y - u * 0.85, u * 1.8, u * 0.85);
-  ctx.fill();
-  ctx.fillStyle = THEME.merchant;
-  ctx.beginPath();
-  ctx.moveTo(x - u * 1.15, y - u * 0.85);
-  ctx.lineTo(x + u * 1.15, y - u * 0.85);
-  ctx.lineTo(x + u * 0.8, y - u * 1.45);
-  ctx.lineTo(x - u * 0.8, y - u * 1.45);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = THEME.ink;
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  const pulse = 0.6 + 0.4 * Math.sin(time * 0.005);
-  ctx.fillStyle = THEME.crit;
-  ctx.globalAlpha = pulse;
-  ctx.beginPath();
-  ctx.arc(x + u * 0.95, y - u * 1.5, u * 0.16, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.globalAlpha = 1;
+  const { cam, view } = frame;
+  drawMerchantProp(
+    ctx, merchant, frame.state.player.gold,
+    projectX(merchant.pos.x, cam, view), projectY(merchant.pos.y, 0, cam, view), cam.zoom,
+    frame.time, frame.reduceMotion === true,
+  );
 }
 
 function drawEnemy(ctx: Ctx2D, frame: WorldFrame, index: number, wx: number, wy: number): void {
   const e = frame.state.enemies[index];
   if (e === undefined) return;
-  const { cam, view } = frame;
-  const ranged = isRanged(frame, e.kind);
-  const visual = enemyVisual(e.kind, ranged);
+  const { cam, view, prev } = frame;
+  const visual = enemyVisual(e.kind, isRanged(frame, e.kind));
   const x = projectX(wx, cam, view);
   const y = projectY(wy, 0, cam, view);
-  const r = e.radius * visual.scale * cam.zoom;
+  // One sprite unit is one (hit radius x visual scale) of world space.
+  const unit = e.radius * visual.scale * cam.zoom;
 
-  let alpha = 1;
+  // Facing follows movement (the sim's per-tick delta, not the interpolated one)
+  // and holds when the enemy stops. Enemies never seen moving face the player.
+  const before = prev?.enemies[index];
+  const dx = before !== undefined && before.id === e.id ? e.pos.x - before.pos.x : 0;
+  const face = facingFor(e.id, dx, frame.state.player.pos.x >= e.pos.x ? 1 : -1);
+  const step = animFrame(frame.time, e.id, visual.frameMs, frame.reduceMotion === true);
+
+  const dying = e.dyingFor !== undefined;
   let swell = 1;
-  if (e.dyingFor !== undefined) {
-    const t = Math.max(0, Math.min(1, e.dyingFor / DEATH_FADE_TICKS));
-    alpha = t * 0.8;
+  if (dying) {
+    const t = Math.max(0, Math.min(1, e.dyingFor! / DEATH_FADE_TICKS));
+    ctx.globalAlpha = t * 0.8;
     swell = 1 + (1 - t) * 0.5;
   }
-  ctx.globalAlpha = alpha;
 
   // Stagger doubles as the hit flash: the sim already tells us it was just hit.
-  const struck = e.stagger > 0;
-  ctx.fillStyle = e.dyingFor !== undefined ? THEME.crit : struck ? visual.rim : visual.body;
-  pathEnemy(ctx, visual.shape, x, y, r * swell);
-  ctx.fill();
-
-  if (e.dyingFor === undefined) {
-    ctx.strokeStyle = THEME.ink;
-    ctx.lineWidth = e.isBoss ? 2.5 : 1.25;
-    ctx.stroke();
-
-    // Rim light: a short arc along the top edge only.
-    ctx.strokeStyle = visual.rim;
-    ctx.globalAlpha = 0.5;
-    ctx.lineWidth = e.isBoss ? 2.5 : 1.25;
-    ctx.beginPath();
-    ctx.arc(x, y - r * 0.55, r * 0.82, Math.PI * 1.15, Math.PI * 1.85);
-    ctx.stroke();
+  // A dying creature is a white flash that fades out.
+  drawCreature(ctx, creatureCache, visual, step, dying || e.stagger > 0, x, y, unit, face < 0, swell);
+  if (dying) {
     ctx.globalAlpha = 1;
-
-    if (ranged) {
-      // A charged orb above the raised arm. Same hue as its shots, so the player
-      // learns "pink means incoming" from one look.
-      ctx.fillStyle = PROJECTILE_CORE;
-      ctx.beginPath();
-      ctx.arc(x + r * 1.1, y - r * 1.75, r * 0.3, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    if (e.isBoss) drawBossPip(ctx, frame, index, x, y, r);
-    else if (e.hp < e.maxHp) drawTinyBar(ctx, x, y - r * 2.1, r * 1.5, e.hp / e.maxHp);
+    return;
   }
-  ctx.globalAlpha = 1;
+
+  if (e.isBoss) drawBossPip(ctx, frame, index, x, y, unit * visual.height / 2.4);
+  else if (e.hp < e.maxHp) {
+    drawTinyBar(ctx, x, y - unit * visual.height - 5, Math.max(9, unit * 1.15), e.hp / e.maxHp);
+  }
 }
 
 function drawTinyBar(ctx: Ctx2D, cx: number, y: number, halfWidth: number, frac: number): void {
   const w = halfWidth * 2;
-  const h = Math.max(2, halfWidth * 0.18);
+  const h = Math.max(3, Math.min(6, halfWidth * 0.3));
+  ctx.fillStyle = THEME.ink;
+  ctx.fillRect(cx - halfWidth - 1, y - 1, w + 2, h + 2);
   ctx.fillStyle = THEME.hpBack;
   ctx.fillRect(cx - halfWidth, y, w, h);
   ctx.fillStyle = THEME.hp;
@@ -564,29 +372,29 @@ function drawBossPip(
 ): void {
   const e = frame.state.enemies[index];
   if (e === undefined) return;
-  const w = r * 2.2;
-  const h = Math.max(5, r * 0.2);
+  const w = Math.min(r * 2.2, 320);
+  const h = Math.max(6, Math.min(14, r * 0.1));
   const top = y - r * 2.5;
   ctx.fillStyle = THEME.hpBack;
   ctx.fillRect(x - w / 2, top, w, h);
   ctx.fillStyle = THEME.boss;
   ctx.fillRect(x - w / 2, top, w * Math.max(0, Math.min(1, e.hp / e.maxHp)), h);
   ctx.strokeStyle = THEME.ink;
-  ctx.lineWidth = 1;
+  ctx.lineWidth = 1.5;
   ctx.strokeRect(x - w / 2, top, w, h);
-
-  ctx.font = font(Math.max(9, h * 1.6), 'bold');
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'bottom';
-  ctx.fillStyle = THEME.text;
-  ctx.fillText(`${Math.ceil(e.hp)}/${Math.round(e.maxHp)}`, x, top - 2);
+  // No numeric readout here. The HUD's boss bar already shows the exact figure,
+  // and this one floats above a 2.6x boss, so near the top of the screen the two
+  // stacked and the world copy was clipped under the HUD's ("966/1100").
 }
 
+/** The hero's last horizontal facing: holds while they stand still or move vertically. */
+let heroFace = 1;
+
 function drawPlayer(ctx: Ctx2D, frame: WorldFrame, wx: number, wy: number, hurt: number): void {
-  const { state, cam, view, palette, time } = frame;
+  const { state, prev, cam, view, palette, time } = frame;
   const x = projectX(wx, cam, view);
   const y = projectY(wy, 0, cam, view);
-  const r = 0.52 * cam.zoom;
+  const unit = 0.6 * cam.zoom;
 
   // Pickup radius ring: the single most useful piece of positional information
   // in the genre, and it doubles as the player's ground anchor.
@@ -603,6 +411,18 @@ function drawPlayer(ctx: Ctx2D, frame: WorldFrame, wx: number, wy: number, hurt:
   );
   ctx.stroke();
   ctx.setLineDash([]);
+
+  // The hero's own soft halo: a warm gold pool at their feet, so they are the
+  // brightest, warmest thing on screen.
+  ctx.fillStyle = '#ffd166';
+  ctx.globalAlpha = 0.24;
+  ctx.beginPath();
+  ctx.ellipse(x, y, unit * 2.1, unit * 2.1 * Y_SQUASH, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 0.28;
+  ctx.beginPath();
+  ctx.ellipse(x, y, unit * 1.35, unit * 1.35 * Y_SQUASH, 0, 0, Math.PI * 2);
+  ctx.fill();
   ctx.globalAlpha = 1;
 
   const invuln = state.player.invulnerable > 0;
@@ -610,30 +430,20 @@ function drawPlayer(ctx: Ctx2D, frame: WorldFrame, wx: number, wy: number, hurt:
   const blink = invuln && Math.sin(time * 0.0157) > 0;
   ctx.globalAlpha = blink ? 0.55 : 1;
 
-  ctx.fillStyle = hurt > 0.2 ? THEME.hpLow : '#dfe9d8';
-  ctx.beginPath();
-  ctx.moveTo(x - r * 0.8, y + r * 0.35);
-  ctx.lineTo(x - r * 0.85, y - r * 1.05);
-  ctx.quadraticCurveTo(x, y - r * 2.0, x + r * 0.85, y - r * 1.05);
-  ctx.lineTo(x + r * 0.8, y + r * 0.35);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = THEME.ink;
-  ctx.lineWidth = 2;
-  ctx.stroke();
+  // Facing: the hero visibly turns to face where they last moved.
+  const fx = state.player.facing.x;
+  if (fx > 0.15) heroFace = 1;
+  else if (fx < -0.15) heroFace = -1;
 
-  // Facing: a wedge on the leading edge, so the auto-attack direction reads.
-  const f = state.player.facing;
-  const len = Math.hypot(f.x, f.y) || 1;
-  const fx = (f.x / len) * r * 1.25;
-  const fy = (f.y / len) * r * 1.25 * Y_SQUASH;
-  ctx.fillStyle = palette.accent;
-  ctx.beginPath();
-  ctx.moveTo(x + fx, y - r * 0.75 + fy);
-  ctx.lineTo(x + fx * 0.25 - fy * 0.5, y - r * 0.75 + fy * 0.25 + fx * 0.5);
-  ctx.lineTo(x + fx * 0.25 + fy * 0.5, y - r * 0.75 + fy * 0.25 - fx * 0.5);
-  ctx.closePath();
-  ctx.fill();
+  const p0 = prev?.player.pos;
+  const moving = p0 !== undefined
+    ? Math.abs(state.player.pos.x - p0.x) + Math.abs(state.player.pos.y - p0.y) > 0.002
+    : false;
+  const reduce = frame.reduceMotion === true;
+  // Standing still: a slow breath (a 1 px rise), and the legs together.
+  const step = moving ? animFrame(time, 0, 95, reduce) : 0;
+  const breathe = moving || reduce ? 0 : Math.sin(time * 0.004) * unit * 0.04;
+  drawHero(ctx, creatureCache, step, hurt > 0.2 ? 2 : 0, x, y + breathe, unit, heroFace < 0);
   ctx.globalAlpha = 1;
 
   // Active shrine buffs read as orbiting motes (AC-14.1 is a tick countdown, so
@@ -645,9 +455,9 @@ function drawPlayer(ctx: Ctx2D, frame: WorldFrame, wx: number, wy: number, hurt:
     for (let i = 0; i < buffs; i++) {
       const a = time * 0.002 + (i * Math.PI * 2) / buffs;
       ctx.ellipse(
-        x + Math.cos(a) * r * 1.9,
-        y - r * 0.8 + Math.sin(a) * r * 1.9 * Y_SQUASH,
-        r * 0.16, r * 0.16, 0, 0, Math.PI * 2,
+        x + Math.cos(a) * unit * 2.3,
+        y - unit * 1.5 + Math.sin(a) * unit * 2.3 * Y_SQUASH,
+        unit * 0.2, unit * 0.2, 0, 0, Math.PI * 2,
       );
     }
     ctx.fill();

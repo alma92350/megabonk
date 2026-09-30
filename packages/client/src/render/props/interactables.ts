@@ -15,7 +15,7 @@ import { Y_SQUASH } from '../projection.js';
 import type { SpriteCache } from '../atlas.js';
 import { U } from './obstacleStyle.js';
 import { bob, glowPulse, twinkle } from './motion.js';
-import { FEET, blit, inkStroke, paintGroundDisc, paintHalo, paintSpark, polygon, propCache } from './bake.js';
+import { FEET, Prop, inkStroke, paintGroundDisc, paintHalo, paintSpark, polygon, propCache } from './bake.js';
 import { CHEST_GLOW, INK, rgba, shrineTint, type RuneGlyph, type ShrineTint } from './palette.js';
 
 export interface InteractableState {
@@ -372,6 +372,42 @@ function paintBeam(ctx: Ctx2D, color: string, h: number): void {
 
 // ---- entry -----------------------------------------------------------------
 
+const CHEST_PROPS = {
+  groundGlow: new Prop('ix:ground-glow:chest', 150, 150, (c) => paintHalo(c, CHEST_GLOW, 72, 0.9)),
+  beam: new Prop('ix:beam:chest', 40, 130, (c) => paintBeam(c, CHEST_GLOW, 120), { ax: 0.5, ay: 0.92 }),
+  halo: new Prop('ix:halo:chest', 130, 130, (c) => paintHalo(c, CHEST_GLOW, 62, 0.8)),
+  armed: new Prop('ix:chest:armed', CHEST_W, CHEST_H, (c) => paintChest(c, false), FEET),
+  spent: new Prop('ix:chest:spent', CHEST_W, CHEST_H, (c) => paintChest(c, true), FEET),
+  dust: new Prop('ix:dust', 100, 60, (c) => paintGroundDisc(c, 34, 12, '#000000', 0.4)),
+};
+const SPARK = new Prop('pk:spark', 24, 24, (c) => paintSpark(c, 11));
+const SPENT_SHRINE = {
+  rune: new Prop('ix:rune:spent', 130, 90, (c) => paintRuneCircle(c, null)),
+  altar: new Prop('ix:altar:spent', ALTAR_W, ALTAR_H, (c) => paintAltar(c, null), FEET, 1.18),
+};
+
+interface TintProps {
+  readonly groundGlow: Prop; readonly rune: Prop; readonly beam: Prop;
+  readonly altar: Prop; readonly halo: Prop; readonly floater: Prop;
+}
+const tintProps = new Map<string, TintProps>();
+
+function propsFor(t: ShrineTint): TintProps {
+  let p = tintProps.get(t.id);
+  if (p === undefined) {
+    p = {
+      groundGlow: new Prop(`ix:ground-glow:${t.id}`, 190, 190, (c) => paintHalo(c, t.color, 92, 0.85)),
+      rune: new Prop(`ix:rune:${t.id}`, 130, 90, (c) => paintRuneCircle(c, t.color)),
+      beam: new Prop(`ix:beam:${t.id}`, 40, 200, (c) => paintBeam(c, t.color, 190), { ax: 0.5, ay: 0.95 }),
+      altar: new Prop(`ix:altar:${t.id}`, ALTAR_W, ALTAR_H, (c) => paintAltar(c, t), FEET, 1.18),
+      halo: new Prop(`ix:halo:${t.id}`, 120, 120, (c) => paintHalo(c, t.color, 56, 0.9), undefined, 1.18),
+      floater: new Prop(`ix:floater:${t.id}`, 40, 52, (c) => paintFloater(c, t), undefined, 1.18),
+    };
+    tintProps.set(t.id, p);
+  }
+  return p;
+}
+
 export function drawInteractableProp(
   ctx: Ctx2D, it: Interactable, x: number, groundY: number, zoom: number,
   time: number, reduce: boolean, cache: SpriteCache = propCache,
@@ -380,58 +416,49 @@ export function drawInteractableProp(
   const armed = !it.used;
 
   if (it.kind === 'chest') {
+    const P = CHEST_PROPS;
     if (armed) {
       const pulse = glowPulse(time, it.id * 0.9, reduce);
-      blit(ctx, cache, 'ix:ground-glow:chest', 150, 150, x, groundY, k, k * Y_SQUASH, 0.35 + 0.5 * pulse,
-        (c) => paintHalo(c, CHEST_GLOW, 72, 0.9));
-      blit(ctx, cache, 'ix:beam:chest', 40, 130, x, groundY - 20 * k, k, k, 0.35 + 0.45 * pulse,
-        (c) => paintBeam(c, CHEST_GLOW, 120), { ax: 0.5, ay: 0.92 });
-      blit(ctx, cache, 'ix:halo:chest', 130, 130, x, groundY - 22 * k, k, k, 0.25 + 0.4 * pulse,
-        (c) => paintHalo(c, CHEST_GLOW, 62, 0.8));
+      P.groundGlow.draw(ctx, cache, zoom, x, groundY, 0.35 + 0.5 * pulse, 1, Y_SQUASH);
+      P.beam.draw(ctx, cache, zoom, x, groundY - 20 * k, 0.35 + 0.45 * pulse);
+      P.halo.draw(ctx, cache, zoom, x, groundY - 22 * k, 0.25 + 0.4 * pulse);
     } else {
-      blit(ctx, cache, 'ix:dust', 100, 60, x, groundY, k, k, 0.5, (c) => paintGroundDisc(c, 34, 12, '#000000', 0.4));
+      P.dust.draw(ctx, cache, zoom, x, groundY, 0.5);
     }
-    blit(ctx, cache, armed ? 'ix:chest:armed' : 'ix:chest:spent', CHEST_W, CHEST_H, x, groundY, k, k, armed ? 1 : 0.82,
-      (c) => paintChest(c, !armed), FEET);
+    (armed ? P.armed : P.spent).draw(ctx, cache, zoom, x, groundY, armed ? 1 : 0.82);
     if (armed) {
       for (let i = 0; i < 2; i++) {
         const tw = twinkle(time, it.id + i * 3.7, reduce);
         if (tw > 0.04) {
-          const s = k * tw * 1.1;
-          blit(ctx, cache, 'pk:spark', 24, 24, x + (i === 0 ? -16 : 14) * k, groundY - (i === 0 ? 46 : 38) * k, s, s, 1,
-            (c) => paintSpark(c, 11));
+          SPARK.draw(ctx, cache, zoom, x + (i === 0 ? -16 : 14) * k, groundY - (i === 0 ? 46 : 38) * k, 1, tw * 1.1, tw * 1.1);
         }
       }
     }
     return;
   }
 
-  const t = shrineTint(it.shrineId);
   if (!armed) {
-    blit(ctx, cache, 'ix:rune:spent', 130, 90, x, groundY, k, k, 1, (c) => paintRuneCircle(c, null));
-    blit(ctx, cache, 'ix:altar:spent', ALTAR_W, ALTAR_H, x, groundY, k, k, 1, (c) => paintAltar(c, null), FEET);
+    SPENT_SHRINE.rune.draw(ctx, cache, zoom, x, groundY);
+    SPENT_SHRINE.altar.draw(ctx, cache, zoom, x, groundY);
     return;
   }
 
+  const t = shrineTint(it.shrineId);
+  const P = propsFor(t);
+  const ka = k * 1.18;
   const pulse = glowPulse(time, it.id * 1.3, reduce);
-  blit(ctx, cache, `ix:ground-glow:${t.id}`, 190, 190, x, groundY, k, k * Y_SQUASH, 0.4 + 0.5 * pulse,
-    (c) => paintHalo(c, t.color, 92, 0.85));
-  blit(ctx, cache, `ix:rune:${t.id}`, 130, 90, x, groundY, k, k, 0.55 + 0.45 * pulse,
-    (c) => paintRuneCircle(c, t.color));
-  blit(ctx, cache, `ix:beam:${t.id}`, 40, 200, x, groundY - 6 * k, k, k, 0.3 + 0.45 * pulse,
-    (c) => paintBeam(c, t.color, 190), { ax: 0.5, ay: 0.95 });
-  blit(ctx, cache, `ix:altar:${t.id}`, ALTAR_W, ALTAR_H, x, groundY, k, k, 1, (c) => paintAltar(c, t), FEET);
+  P.groundGlow.draw(ctx, cache, zoom, x, groundY, 0.4 + 0.5 * pulse, 1, Y_SQUASH);
+  P.rune.draw(ctx, cache, zoom, x, groundY, 0.55 + 0.45 * pulse);
+  P.beam.draw(ctx, cache, zoom, x, groundY - 6 * k, 0.3 + 0.45 * pulse);
+  P.altar.draw(ctx, cache, zoom, x, groundY);
   const fz = bob(time, it.id, 0.16, reduce);
-  const fy = groundY - (100 + fz * U) * k;
-  blit(ctx, cache, `ix:halo:${t.id}`, 120, 120, x, fy, k, k, 0.5 + 0.5 * pulse,
-    (c) => paintHalo(c, t.color, 56, 0.9));
-  blit(ctx, cache, `ix:floater:${t.id}`, 40, 52, x, fy, k, k, 1, (c) => paintFloater(c, t));
+  const fy = groundY - (100 + fz * U) * ka;
+  P.halo.draw(ctx, cache, zoom, x, fy, 0.5 + 0.5 * pulse);
+  P.floater.draw(ctx, cache, zoom, x, fy);
   for (let i = 0; i < 2; i++) {
     const tw = twinkle(time, it.id + i * 2.9, reduce);
     if (tw > 0.04) {
-      const s = k * tw * 1.2;
-      blit(ctx, cache, 'pk:spark', 24, 24, x + (i === 0 ? -20 : 19) * k, fy + (i === 0 ? -8 : 10) * k, s, s, 1,
-        (c) => paintSpark(c, 11));
+      SPARK.draw(ctx, cache, zoom, x + (i === 0 ? -20 : 19) * k, fy + (i === 0 ? -8 : 10) * k, 1, tw * 1.2, tw * 1.2);
     }
   }
 }

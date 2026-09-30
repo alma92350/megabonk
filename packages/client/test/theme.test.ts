@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { RARITIES } from '@megabonk/sim';
+import { enemies } from '@megabonk/content';
 import { RARITY_VISUALS, THEME, enemyVisual, rarityVisual } from '../src/render/theme.js';
 
 describe('AC-19.1 rarity is conveyed by colour AND shape AND text', () => {
@@ -49,7 +50,7 @@ describe('AC-19.1 rarity is conveyed by colour AND shape AND text', () => {
 
 describe('enemy visuals', () => {
   it('gives each shipped enemy kind a distinct silhouette', () => {
-    const kinds = ['grunt', 'runner', 'brute', 'lobber', 'swarmling', 'tank', 'warden'];
+    const kinds = ['grunt', 'runner', 'brute', 'lobber', 'swarmling', 'tank', 'warden', 'stalker', 'seer'];
     const shapes = kinds.map((k) => enemyVisual(k).shape);
     expect(new Set(shapes).size).toBe(kinds.length);
   });
@@ -61,9 +62,11 @@ describe('enemy visuals', () => {
   });
 
   it('makes the boss the largest', () => {
-    const boss = enemyVisual('warden').scale;
+    // Footprint (sim hit radius x visual scale) is what the eye sees.
+    const foot = (k: string): number => enemies[k]!.radius * enemyVisual(k).scale;
+    const boss = foot('warden');
     for (const k of ['grunt', 'runner', 'brute', 'lobber', 'swarmling', 'tank']) {
-      expect(enemyVisual(k).scale).toBeLessThan(boss);
+      expect(foot(k)).toBeLessThan(boss);
     }
   });
 
@@ -87,9 +90,11 @@ describe('theme', () => {
 });
 
 describe('ranged enemies look different because they behave differently', () => {
-  it('swaps in a caster silhouette when the enemy is ranged', () => {
-    expect(enemyVisual('lobber').shape).not.toBe('caster');
-    expect(enemyVisual('lobber', true).shape).toBe('caster');
+  it('gives ranged kinds the hooded imp / seer designs, melee kinds neither', () => {
+    expect(enemyVisual('lobber').ranged).toBe(true);
+    expect(enemyVisual('seer').ranged).toBe(true);
+    expect(enemyVisual('grunt').ranged).toBe(false);
+    expect(enemyVisual('lobber', true).shape).toBe('imp');
   });
 
   it('keeps the body colour so the archetype is still identifiable', () => {

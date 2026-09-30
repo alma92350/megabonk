@@ -134,7 +134,7 @@ export interface ShrineTint {
 export const SHRINE_TINTS: Readonly<Record<string, ShrineTint>> = Object.freeze({
   forge: { id: 'forge', color: '#ff8a2a', light: '#ffd9a8', glyph: 'flame' },
   fleetfoot: { id: 'fleetfoot', color: '#6fb0ff', light: '#d3e6ff', glyph: 'wing' },
-  bulwark: { id: 'bulwark', color: '#b77dff', light: '#e9d8ff', glyph: 'shield' },
+  bulwark: { id: 'bulwark', color: '#c496ff', light: '#e9d8ff', glyph: 'shield' },
   avarice: { id: 'avarice', color: '#ffd23f', light: '#fff2b0', glyph: 'coin' },
 });
 

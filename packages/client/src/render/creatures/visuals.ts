@@ -50,23 +50,23 @@ function v(
 
 export const ENEMY_VISUALS: Readonly<Record<string, EnemyVisual>> = Object.freeze({
   // fodder swarm: rose-pink goblin
-  grunt: v('grunt', 'goblin', '#ea6a96', '#b53d6b', '#ffa6c2', '#ffc9da', '#8a5a3a', '#3a1424', 1.2, false, 2.5, 130),
+  grunt: v('grunt', 'goblin', '#ea6a96', '#b53d6b', '#ffa6c2', '#ffc9da', '#8a5a3a', '#3a1424', 1.35, false, 2.5, 130),
   // fast chaser: amber fox
-  runner: v('runner', 'fox', '#f28a2e', '#bd5619', '#ffc36b', '#ffdca8', '#fff2dc', '#3a1c0c', 1.3, false, 2.1, 90),
+  runner: v('runner', 'fox', '#f28a2e', '#bd5619', '#ffc36b', '#ffdca8', '#fff2dc', '#3a1c0c', 1.5, false, 2.1, 90),
   // insect swarm: cyan beetle
-  swarmling: v('swarmling', 'bug', '#3ccfe6', '#1c8fad', '#a8f3ff', '#d2fbff', '#e8fdff', '#0c3040', 1.35, false, 2.0, 70),
+  swarmling: v('swarmling', 'bug', '#3ccfe6', '#1c8fad', '#a8f3ff', '#d2fbff', '#e8fdff', '#0c3040', 1.55, false, 2.0, 70),
   // heavy bruiser: red tusked ogre
-  brute: v('brute', 'ogre', '#d63a35', '#94201f', '#ff7d6c', '#ffb5a6', '#f1e6c8', '#3a0c0c', 1.25, false, 3.0, 190),
+  brute: v('brute', 'ogre', '#d63a35', '#94201f', '#ff7d6c', '#ffb5a6', '#f1e6c8', '#3a0c0c', 1.2, false, 3.0, 190),
   // fast tough flanker: indigo wolf
-  stalker: v('stalker', 'wolf', '#5a6cf0', '#3540b0', '#a5b3ff', '#ccd4ff', '#e9edff', '#141a55', 1.5, false, 2.0, 100),
+  stalker: v('stalker', 'wolf', '#4f72f0', '#2f45b8', '#a0b8ff', '#ccd4ff', '#e9edff', '#141a55', 1.6, false, 2.0, 100),
   // ranged harasser: orchid hooded imp with a raised orb
-  lobber: v('lobber', 'imp', '#c27bff', '#8747c8', '#e8c0ff', '#f3daff', '#ff8ad0', '#2a0c48', 1.2, true, 2.7, 140),
+  lobber: v('lobber', 'imp', '#dc6ef0', '#9a3fc0', '#f2b8ff', '#f8d8ff', '#ff8ad0', '#2a0c48', 1.3, true, 2.7, 140),
   // ranged sniper: tall purple robed one-eyed seer
-  seer: v('seer', 'seer', '#8552e0', '#4d2ba0', '#bb9aff', '#d6c4ff', '#ff8ad0', '#1e0c4a', 1.3, true, 3.6, 170),
+  seer: v('seer', 'seer', '#7050e8', '#4530ac', '#b09cff', '#d0c4ff', '#ff8ad0', '#1e0c4a', 1.35, true, 3.6, 170),
   // armoured tank: grey stone golem with lava runes
-  tank: v('tank', 'golem', '#a3a1b8', '#62607c', '#dad8ee', '#efeeff', '#ff9a3c', '#2a2838', 1.3, false, 3.0, 220),
-  // boss: maroon armoured guardian with gold antlers
-  warden: v('warden', 'warden', '#b02a50', '#6b1233', '#e85d86', '#ffa5bd', '#ffc94a', '#2a0616', 1.5, false, 4.2, 240),
+  tank: v('tank', 'golem', '#a6a6b2', '#646470', '#dedee8', '#f0f0f8', '#ff9a3c', '#2a2838', 1.05, false, 3.4, 220),
+  // boss: plum armoured guardian with gold antlers
+  warden: v('warden', 'warden', '#a82a86', '#661056', '#e05ec0', '#ff9fe0', '#ffc94a', '#2a0620', 1.0, false, 4.9, 240),
 });
 
 const FALLBACK_ENEMY: EnemyVisual = Object.freeze(

@@ -12,15 +12,17 @@ import type { Pickup } from '@megabonk/sim';
 import type { Ctx2D } from '../ctx.js';
 import { Z_LIFT } from '../projection.js';
 import type { SpriteCache } from '../atlas.js';
+
 import { U } from './obstacleStyle.js';
 import { bob, glowPulse, popScale, twinkle } from './motion.js';
-import { blit, inkStroke, paintGroundDisc, paintHalo, paintSpark, polygon, propCache } from './bake.js';
+import { Prop, inkStroke, paintGroundDisc, paintHalo, paintSpark, polygon, propCache } from './bake.js';
 import { INK, pickupTier, pickupVisual, type PickupVisual } from './palette.js';
 
 const GEM_R = [8, 10.5, 13, 16] as const;
-const HALO_R = [26, 32, 40, 52] as const;
+const HALO_R = [17, 21, 27, 36] as const;
 /** World-unit float height of a pickup above the ground. */
 const FLOAT_Z = 0.55;
+const PICKUP_SCALE = 1.2;
 
 export function pickupSpriteKey(kind: string, tier: number): string {
   return `pk:${kind}:${tier}`;
@@ -152,6 +154,35 @@ function bodyBox(v: PickupVisual, tier: number): { w: number; h: number } {
   return { w: 32, h: 32 };
 }
 
+const KIND_LIST = ['xp', 'gold', 'heal'] as const;
+
+/**
+ * Halo and body are baked into ONE sprite: a pickup is a single blit (plus a
+ * shadow for the bigger ones and an occasional sparkle). The pulse is the whole
+ * sprite's alpha, which only the translucent halo visibly follows.
+ */
+const PROPS: Readonly<Record<string, readonly Prop[]>> = (() => {
+  const out: Record<string, Prop[]> = {};
+  for (const kind of KIND_LIST) {
+    const v = pickupVisual(kind);
+    const list: Prop[] = [];
+    for (let tier = 0; tier < v.tiers; tier++) {
+      const box = bodyBox(v, tier);
+      const hr = HALO_R[tier] ?? HALO_R[0];
+      const size = Math.max(box.w, box.h, hr * 2);
+      list.push(new Prop(pickupSpriteKey(kind, tier), size, size, (c) => {
+        paintHalo(c, v.glow, hr, 0.62);
+        paintBody(c, v, tier);
+      }, undefined, PICKUP_SCALE));
+    }
+    out[kind] = list;
+  }
+  return out;
+})();
+
+const SHADOW = new Prop('pk:shadow', 40, 20, (c) => paintGroundDisc(c, 9, 4.5, '#000000', 0.55), undefined, PICKUP_SCALE);
+const SPARK = new Prop('pk:spark', 24, 24, (c) => paintSpark(c, 11));
+
 /**
  * Draw one pickup. (x, groundY) is the projected ground point; `zoom` is
  * pixels per world unit. `cache` is injectable for tests.
@@ -162,31 +193,22 @@ export function drawPickupProp(
 ): void {
   const v = pickupVisual(p.kind);
   const tier = Math.min(pickupTier(p.kind, p.value), v.tiers - 1);
-  const k = (zoom / U) * popScale(p.age);
+  const prop = (PROPS[v.kind] ?? PROPS.xp!)[tier]!;
+  const pop = popScale(p.age);
+  const k = (zoom / U) * PICKUP_SCALE * pop;
   const z = FLOAT_Z + bob(time, p.id, 0.12, reduce);
   const y = groundY - z * zoom * Z_LIFT;
   const pulse = glowPulse(time, p.id * 1.7, reduce);
 
-  // Contact shadow shrinks as the pickup rises on its bob.
-  blit(ctx, cache, 'pk:shadow', 40, 20, x, groundY, k, k, 0.5 - (z - FLOAT_Z) * 0.6, (c) => {
-    paintGroundDisc(c, 9, 4.5, '#000000', 0.55);
-  });
-
-  const hr = HALO_R[tier] ?? HALO_R[0];
-  blit(ctx, cache, `pk:halo:${p.kind}:${tier}`, hr * 2, hr * 2, x, y, k, k, 0.4 + 0.5 * pulse,
-    (c) => paintHalo(c, v.glow, hr, 0.85));
-
-  const box = bodyBox(v, tier);
-  // Coins wobble like a slow spin; everything else holds still.
-  const sx = v.shape === 'coin' && tier === 0 ? 0.8 + 0.2 * Math.cos(time * 0.006 + p.id) : 1;
-  blit(ctx, cache, pickupSpriteKey(p.kind, tier), box.w, box.h, x, y, k * sx, k, 1,
-    (c) => paintBody(c, v, tier));
+  // Contact shadow shrinks as the pickup rises on its bob. Tiny gems skip it:
+  // their halo already grounds them and it is a blit per pickup.
+  if (v.kind !== 'xp' || tier >= 2) SHADOW.draw(ctx, cache, zoom, x, groundY, 0.5 - (z - FLOAT_Z) * 0.6, pop, pop);
+  prop.draw(ctx, cache, zoom, x, y, 0.78 + 0.22 * pulse, pop, pop);
 
   const tw = twinkle(time, p.id, reduce);
   if (tw > 0.04) {
-    const s = k * tw * (1 + tier * 0.22);
+    const s = tw * (1 + tier * 0.22);
     const gr = GEM_R[tier] ?? GEM_R[0];
-    blit(ctx, cache, 'pk:spark', 24, 24, x - gr * 0.45 * k, y - gr * 0.7 * k, s, s, 1,
-      (c) => paintSpark(c, 11));
+    SPARK.draw(ctx, cache, zoom, x - gr * 0.45 * k, y - gr * 0.7 * k, 1, s * PICKUP_SCALE * pop, s * PICKUP_SCALE * pop);
   }
 }

@@ -82,54 +82,13 @@ export function rarityVisual(rarity: Rarity): RarityVisual {
   return RARITY_VISUALS[rarity] ?? RARITY_VISUALS.common;
 }
 
-export type EnemyShape = 'blob' | 'dart' | 'hulk' | 'lob' | 'bug' | 'slab' | 'crown' | 'caster';
-
-export interface EnemyVisual {
-  readonly body: string;
-  readonly rim: string;
-  readonly shape: EnemyShape;
-  /** Multiplier on the enemy's own radius when drawing the silhouette. */
-  readonly scale: number;
-}
-
 /**
- * Each shipped archetype gets its own silhouette as well as its own hue, so an
- * enemy is identifiable in a crowd of 1500 at a glance and in greyscale.
+ * The creature roster lives in ./creatures/visuals.ts (one designed character per
+ * kind, with its palette, scale and ranged cue). Re-exported here so existing
+ * call sites keep working.
  */
-const ENEMY_VISUALS: Readonly<Record<string, EnemyVisual>> = Object.freeze({
-  grunt: { body: '#7a8f6d', rim: '#c3dcae', shape: 'blob', scale: 1.0 },
-  runner: { body: '#d0a65e', rim: '#ffd9a0', shape: 'dart', scale: 0.92 },
-  brute: { body: '#a8544a', rim: '#ffb0a0', shape: 'hulk', scale: 1.35 },
-  lobber: { body: '#5f7fa8', rim: '#bcd8ff', shape: 'lob', scale: 1.08 },
-  swarmling: { body: '#b8a24b', rim: '#ffeea8', shape: 'bug', scale: 0.72 },
-  tank: { body: '#6a5a86', rim: '#cbbcf0', shape: 'slab', scale: 1.7 },
-  warden: { body: '#8d2a4a', rim: '#ff87ad', shape: 'crown', scale: 2.6 },
-});
-
-const FALLBACK_ENEMY: EnemyVisual = Object.freeze({
-  body: '#6b7c74', rim: '#aac4b8', shape: 'blob', scale: 1.0,
-});
-
-/**
- * `isRanged` swaps in the `caster` silhouette — a hooded stance with a raised
- * orb. Ranged enemies behave differently (they hold a standoff instead of
- * swarming), and a player who cannot see why an enemy stopped approaching reads
- * it as a bug. Behaviour that differs must look different.
- */
-const rangedVariants = new Map<string, EnemyVisual>();
-
-export function enemyVisual(kind: string, isRanged = false): EnemyVisual {
-  const base = ENEMY_VISUALS[kind] ?? FALLBACK_ENEMY;
-  if (!isRanged) return base;
-  // Cached, not spread per call: this runs once per enemy per frame, and at 1500
-  // entities a fresh object here is 90k allocations a second.
-  let variant = rangedVariants.get(kind);
-  if (variant === undefined) {
-    variant = { ...base, shape: 'caster' };
-    rangedVariants.set(kind, variant);
-  }
-  return variant;
-}
+export { enemyVisual, hasEnemyVisual, ENEMY_VISUALS } from './creatures/visuals.js';
+export type { EnemyVisual, EnemyShape } from './creatures/visuals.js';
 
 /** Enemy shots. Deliberately NOT the biome accent — hostile reads as hot pink. */
 export const PROJECTILE_CORE = '#ff3f6d';

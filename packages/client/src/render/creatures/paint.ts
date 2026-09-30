@@ -52,7 +52,7 @@ export function makePose(c: Ctx2D, p: Pal, frame: number, frames: number): Pose 
   return { c, p, t, s, k: Math.cos(t * TAU), bounce: Math.abs(s) };
 }
 
-function mix(a: string, b: string, f: number): string {
+export function mix(a: string, b: string, f: number): string {
   const x = parseInt(a.slice(1, 7), 16), y = parseInt(b.slice(1, 7), 16);
   const ch = (sh: number): number => Math.round(((x >> sh) & 255) * (1 - f) + ((y >> sh) & 255) * f);
   return `#${((1 << 24) | (ch(16) << 16) | (ch(8) << 8) | ch(0)).toString(16).slice(1)}`;
@@ -72,7 +72,7 @@ export function palFor(v: EnemyVisual, variant: 0 | 1): Pal {
         }
       : {
           body: v.body, shade: v.shade, light: v.light, rim: v.rim, accent: v.accent, dark: v.dark,
-          white: '#fffdf4', pupil: '#120c1a', glow: v.ranged ? RANGED_GLOW : '#fff3b0', ink: INK,
+          white: '#fffdf4', pupil: '#120c1a', glow: v.ranged ? RANGED_GLOW : '#ffe14a', ink: INK,
           accentShade: mix(v.accent, '#000000', 0.32),
         };
     palCache.set(key, p);

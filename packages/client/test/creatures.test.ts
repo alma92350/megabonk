@@ -196,12 +196,12 @@ describe('sprite bake keys', () => {
       for (let id = 1; id <= 40; id++) {
         const v = enemyVisual(kinds[id % kinds.length]!, id % 2 === 0);
         const f = animFrame(frame * 16.7, id, v.frameMs, false);
-        keys.add(creatureKey(v, f, id % 7 === 0));
+        keys.add(creatureKey(v, f, id % 7 === 0, id % 3 === 0, 32));
       }
     }
-    // (kinds + 2 fallbacks) * frames * {normal, flash}
-    expect(keys.size).toBeLessThanOrEqual((KINDS.length + 2) * FRAMES * 2);
-    expect(keys.size).toBeLessThan(150);
+    // (kinds + 2 fallbacks) * frames * {normal, flash} * {right, left}
+    expect(keys.size).toBeLessThanOrEqual((KINDS.length + 2) * FRAMES * 2 * 2);
+    expect(keys.size).toBeLessThan(200);
   });
 
   it('bake once per key and then blit', () => {
@@ -209,16 +209,17 @@ describe('sprite bake keys', () => {
     const cache = new SpriteCache(factory);
     const { ctx, fake } = fakeCtx();
     const v = enemyVisual('brute');
-    for (let i = 0; i < 50; i++) drawCreature(ctx, cache, v, i % 2, false, 100, 100, 1, i % 3 === 0);
-    expect(made()).toBe(2);
+    for (let i = 0; i < 50; i++) drawCreature(ctx, cache, v, i % 2, false, 100, 100, 30, i % 3 === 0);
+    expect(made()).toBe(4); // frames 0 and 1, facing right and left
     expect(fake.calls.drawImage).toBe(50);
+    expect(fake.calls.save ?? 0).toBe(0); // no per-blit state changes: mirroring is baked
     expect(fake.balanced).toBe(true);
   });
 
   it('hero keys are bounded too', () => {
     const keys = new Set<string>();
-    for (let f = 0; f < FRAMES; f++) for (let vr = 0; vr < HERO_VARIANTS; vr++) keys.add(heroKey(f, vr));
-    expect(keys.size).toBe(FRAMES * HERO_VARIANTS);
+    for (let f = 0; f < FRAMES; f++) for (let vr = 0; vr < HERO_VARIANTS; vr++) for (const fl of [false, true]) keys.add(heroKey(f, vr, fl, 20));
+    expect(keys.size).toBe(FRAMES * HERO_VARIANTS * 2);
   });
 });
 

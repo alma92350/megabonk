@@ -11,7 +11,7 @@ import { Y_SQUASH } from '../projection.js';
 import type { SpriteCache } from '../atlas.js';
 import { U } from './obstacleStyle.js';
 import { bob, glowPulse, twinkle } from './motion.js';
-import { FEET, blit, inkStroke, paintGroundDisc, paintHalo, paintSpark, polygon, propCache } from './bake.js';
+import { FEET, Prop, inkStroke, paintGroundDisc, paintHalo, paintSpark, polygon, propCache } from './bake.js';
 import { INK, MERCHANT_GLOW } from './palette.js';
 
 export interface Affordability {
@@ -183,6 +183,16 @@ function paintSign(ctx: Ctx2D): void {
   ctx.stroke();
 }
 
+const M = {
+  groundGlow: new Prop('mv:ground-glow', 190, 190, (c) => paintHalo(c, MERCHANT_GLOW, 92, 0.85)),
+  shadow: new Prop('mv:shadow', 100, 40, (c) => paintGroundDisc(c, 34, 11, '#000000', 0.5)),
+  trader: new Prop('mv:trader', BOX_W, BOX_H, paintTrader, FEET),
+  lanternHalo: new Prop('mv:lantern-halo', 100, 100, (c) => paintHalo(c, '#ffdc80', 46, 0.9)),
+  signHalo: new Prop('mv:sign-halo', 110, 110, (c) => paintHalo(c, MERCHANT_GLOW, 50, 0.95)),
+  sign: new Prop('mv:sign', 44, 44, paintSign),
+  spark: new Prop('pk:spark', 24, 24, (c) => paintSpark(c, 11)),
+};
+
 export function drawMerchantProp(
   ctx: Ctx2D, m: MerchantState, gold: number, x: number, groundY: number, zoom: number,
   time: number, reduce: boolean, cache: SpriteCache = propCache,
@@ -192,23 +202,16 @@ export function drawMerchantProp(
   const pulse = glowPulse(time, 0.7, reduce);
   const hot = aff.affordable > 0;
 
-  blit(ctx, cache, 'mv:ground-glow', 190, 190, x, groundY, k, k * Y_SQUASH, 0.3 + 0.35 * pulse,
-    (c) => paintHalo(c, MERCHANT_GLOW, 92, 0.85));
-  blit(ctx, cache, 'mv:shadow', 100, 40, x, groundY, k, k, 0.5, (c) => paintGroundDisc(c, 34, 11, '#000000', 0.5));
-  blit(ctx, cache, 'mv:trader', BOX_W, BOX_H, x, groundY, k, k, 1, paintTrader, FEET);
-  // Lantern glow flickers.
-  blit(ctx, cache, 'mv:lantern-halo', 100, 100, x + 32 * k, groundY - 58 * k, k, k, 0.45 + 0.5 * glowPulse(time, 2.1, reduce),
-    (c) => paintHalo(c, '#ffdc80', 46, 0.9));
+  M.groundGlow.draw(ctx, cache, zoom, x, groundY, 0.3 + 0.35 * pulse, 1, Y_SQUASH);
+  M.shadow.draw(ctx, cache, zoom, x, groundY, 0.5);
+  M.trader.draw(ctx, cache, zoom, x, groundY);
+  M.lanternHalo.draw(ctx, cache, zoom, x + 32 * k, groundY - 58 * k, 0.45 + 0.5 * glowPulse(time, 2.1, reduce));
 
   const sy = groundY - (98 + bob(time, 1.9, 0.14, reduce) * U) * k;
-  blit(ctx, cache, 'mv:sign-halo', 110, 110, x, sy, k, k, (hot ? 0.55 : 0.25) + 0.4 * pulse,
-    (c) => paintHalo(c, MERCHANT_GLOW, 50, 0.95));
-  blit(ctx, cache, 'mv:sign', 44, 44, x, sy, k, k, hot ? 1 : 0.7, paintSign);
+  M.signHalo.draw(ctx, cache, zoom, x, sy, (hot ? 0.55 : 0.25) + 0.4 * pulse);
+  M.sign.draw(ctx, cache, zoom, x, sy, hot ? 1 : 0.7);
   const tw = twinkle(time, 5.3, reduce);
-  if (tw > 0.04 && hot) {
-    const s = k * tw * 1.2;
-    blit(ctx, cache, 'pk:spark', 24, 24, x + 12 * k, sy - 13 * k, s, s, 1, (c) => paintSpark(c, 11));
-  }
+  if (tw > 0.04 && hot) M.spark.draw(ctx, cache, zoom, x + 12 * k, sy - 13 * k, 1, tw * 1.2, tw * 1.2);
 
   // Stock pips (direct: one merchant per world, a handful of arcs).
   const n = m.stock.length;

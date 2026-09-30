@@ -10,35 +10,101 @@ import { SpriteCache, browserSurfaceFactory, type Anchor, type SpriteDraw } from
 import type { Ctx2D } from '../ctx.js';
 import { INK, rgba } from './palette.js';
 
-export const propCache = new SpriteCache(browserSurfaceFactory());
+/**
+ * Backing-store scale of baked props. The renderer scales its context by the
+ * device pixel ratio (main.ts), so baking at that ratio makes every blit a 1:1
+ * pixel copy, which is several times cheaper than a resampled one.
+ */
+const RES = ((): number => {
+  const dpr = (globalThis as { devicePixelRatio?: number }).devicePixelRatio;
+  return Math.min(2, Math.max(1, Math.round(typeof dpr === 'number' && dpr > 0 ? dpr : 1)));
+})();
+
+export const propCache = new SpriteCache(browserSurfaceFactory(), { resolution: RES });
 
 export const CENTRE: Anchor = Object.freeze({ ax: 0.5, ay: 0.5 });
-/** Anchor at the bottom-centre of the box: the ground contact point. */
+/** Anchor near the bottom-centre of the box: the ground contact point. */
 export const FEET: Anchor = Object.freeze({ ax: 0.5, ay: 0.86 });
 
+/** Zoom is bucketed to whole pixels-per-unit so bake keys stay few (14..48 -> <= 35). */
+export function zoomBucket(zoom: number): number {
+  const z = Math.round(zoom);
+  return z < 8 ? 8 : z > 64 ? 64 : z;
+}
+
+interface Zoomed {
+  readonly key: string;
+  readonly bw: number;
+  readonly bh: number;
+  readonly draw: SpriteDraw;
+}
+
 /**
- * Blit (or, when unbakeable, draw directly) a sprite with a NON-uniform scale
- * and an alpha. Restores globalAlpha to 1. No allocation on the baked path.
+ * A drawable prop picture: authored once in anchor-local space at U px/unit,
+ * baked per zoom bucket at the exact size it is blitted (so a blit is a 1:1,
+ * integer-snapped copy), and drawn directly when no surface is available.
+ * Instances are created once (module level / memoised) so the per-frame path
+ * allocates nothing: no closures, no key strings.
  */
-export function blit(
-  ctx: Ctx2D, cache: SpriteCache, key: string, w: number, h: number,
-  x: number, y: number, sx: number, sy: number, alpha: number,
-  draw: SpriteDraw, anchor: Anchor = CENTRE,
-): void {
-  if (alpha <= 0.003 || sx === 0 || sy === 0) return;
-  const sprite = cache.get(key, w, h, draw, anchor);
-  ctx.globalAlpha = alpha > 1 ? 1 : alpha;
-  if (sprite !== null) {
-    const dw = w * sx, dh = h * sy;
-    ctx.drawImage(sprite.surface, x - dw * anchor.ax, y - dh * anchor.ay, dw, dh);
-  } else {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.scale(sx, sy);
-    draw(ctx, w, h);
-    ctx.restore();
+export class Prop {
+  private readonly zoomed = new Map<number, Zoomed>();
+
+  constructor(
+    readonly key: string,
+    readonly w: number,
+    readonly h: number,
+    private readonly paint: SpriteDraw,
+    readonly anchor: Anchor = CENTRE,
+    /** Constant extra scale applied when baking (e.g. pickups are drawn 1.2x). */
+    readonly scale = 1,
+  ) {}
+
+  private make(zb: number): Zoomed {
+    const kz = (zb / 32) * this.scale;
+    const bw = Math.max(1, Math.ceil(this.w * kz));
+    const bh = Math.max(1, Math.ceil(this.h * kz));
+    const fx = bw / this.w, fy = bh / this.h;
+    const paint = this.paint;
+    const w = this.w, h = this.h;
+    const z: Zoomed = {
+      key: `${this.key}@${zb}`, bw, bh,
+      draw: (c) => { c.scale(fx, fy); paint(c, w, h); },
+    };
+    this.zoomed.set(zb, z);
+    return z;
   }
-  ctx.globalAlpha = 1;
+
+  /**
+   * Draw with the anchor at (x, y). `sx`/`sy` are extra scales (1 = the exact
+   * baked size, the fast path). `alpha` is restored to 1 afterwards.
+   */
+  draw(
+    ctx: Ctx2D, cache: SpriteCache, zoom: number, x: number, y: number,
+    alpha = 1, sx = 1, sy = 1,
+  ): void {
+    if (alpha <= 0.003 || sx <= 0 || sy <= 0) return;
+    const zb = zoomBucket(zoom);
+    const z = this.zoomed.get(zb) ?? this.make(zb);
+    const sprite = cache.get(z.key, z.bw, z.bh, z.draw, this.anchor);
+    ctx.globalAlpha = alpha > 1 ? 1 : alpha;
+    if (sprite !== null) {
+      const dw = z.bw * sx, dh = z.bh * sy;
+      let dx = x - dw * this.anchor.ax, dy = y - dh * this.anchor.ay;
+      if (sx === 1 && sy === 1) {
+        dx = Math.round(dx * RES) / RES;
+        dy = Math.round(dy * RES) / RES;
+      }
+      ctx.drawImage(sprite.surface, dx, dy, dw, dh);
+    } else {
+      const k = (zoom / 32) * this.scale;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(k * sx, k * sy);
+      this.paint(ctx, this.w, this.h);
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  }
 }
 
 /** Soft radial glow, drawn in anchor-local space. `peak` is the centre alpha. */

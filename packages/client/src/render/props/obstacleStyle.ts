@@ -74,9 +74,9 @@ export function obstacleStyle(radius: number, height: number, seed: number): Obs
   let width: number;
   let above: number; // px above the base centre
   if (kind === 'tree') {
-    const crown = rPx * 1.12;
-    width = crown * 2 + 16;
-    above = lift * 1.15 + crown * 1.05 + 10;
+    const crown = rPx;
+    width = crown * 2 + 20;
+    above = lift * 0.9 + crown * 1.55 + 12;
   } else if (kind === 'crag') {
     width = rPx * 2.1 + 16;
     above = lift * 1.5 + rPx * 0.6 + 10;

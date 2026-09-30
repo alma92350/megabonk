@@ -12,7 +12,7 @@
 
 import { EMPTY_PROFILE, parseProfile, serialiseProfile, type Profile } from '@megabonk/meta';
 
-export const PROFILE_KEY = 'megabonk.profile.v1';
+export const PROFILE_KEY = 'hollowlight.profile.v1';
 
 export interface StoragePort {
   getItem(key: string): string | null;
@@ -71,7 +71,7 @@ export function detectStorage(): StoragePort | null {
     const candidate = (globalThis as { localStorage?: StoragePort }).localStorage;
     if (candidate === undefined || candidate === null) return null;
     // Probe it: a private window can expose the object and refuse every write.
-    const probe = '__megabonk_probe__';
+    const probe = '__hollowlight_probe__';
     candidate.setItem(probe, '1');
     candidate.getItem(probe);
     candidate.removeItem?.(probe);

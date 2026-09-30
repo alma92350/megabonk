@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { hubLayout, summaryLayout, offerHeadingPlate, SUMMARY_FOOTER_GAP } from '../src/render/layout.js';
 import { layoutCards } from '../src/render/upgrade.js';
 import { formatRuns } from '../src/format.js';
+import { cardKindLabel } from '../src/render/upgrade.js';
 
 const view = (width: number, height: number) => ({ width, height });
 
@@ -136,5 +137,25 @@ describe('offer heading plate: text needs its own backing', () => {
       const cards = layoutCards(3, v);
       expect(p.y + p.height, `viewport ${v.width}x${v.height}`).toBeLessThanOrEqual(cards[0]!.y);
     }
+  });
+});
+
+describe('cardKindLabel: the player-facing name of an offer kind', () => {
+  /**
+   * The sim's internal kind for a passive is 'tome'. Cards used to print that
+   * raw, which put a borrowed term on the most-viewed screen in the game. The
+   * internal id is unchanged (renaming it would break recordings and goldens);
+   * only the label a player reads changes.
+   */
+  it('calls a passive a RITE, not a tome', () => {
+    expect(cardKindLabel('tome')).toBe('RITE');
+  });
+  it('leaves the other kinds alone', () => {
+    expect(cardKindLabel('weapon')).toBe('WEAPON');
+    expect(cardKindLabel('item')).toBe('ITEM');
+    expect(cardKindLabel('gold')).toBe('GOLD');
+  });
+  it('never returns an empty label for an unknown kind', () => {
+    expect(cardKindLabel('mystery').length).toBeGreaterThan(0);
   });
 });

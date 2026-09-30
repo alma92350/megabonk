@@ -87,7 +87,7 @@ describe('drawFrame against a fake 2D context', () => {
     drawFrame(ctx, c);
     expect(fake.balanced).toBe(true);
     expect(fake.calls.fillRect).toBeGreaterThan(0);
-    expect(fake.texts.join(' ')).toMatch(/silver/i);
+    expect(fake.texts.join(' ')).toMatch(/motes/i);
   });
 
   it('draws a live run with entities', () => {
@@ -176,7 +176,7 @@ describe('drawFrame against a fake 2D context', () => {
     expect(c.screen).toBe('summary');
     const done = fakeCtx();
     drawFrame(done.ctx, c);
-    expect(done.fake.texts.join(' ')).toMatch(/silver/i);
+    expect(done.fake.texts.join(' ')).toMatch(/motes/i);
     expect(done.fake.balanced).toBe(true);
   });
 

@@ -17,7 +17,7 @@ import type { Viewport } from './projection.js';
 import { pathRaritySigil } from './shapes.js';
 import { THEME, font, rarityVisual } from './theme.js';
 import { bar, kicker, label, panel, paragraph, scrim } from './ui.js';
-import { cardMarkerFor, layoutCards, shouldShowReroll } from './upgrade.js';
+import { cardKindLabel, cardMarkerFor, layoutCards, shouldShowReroll } from './upgrade.js';
 import { drawWorld, type WorldFrame } from './world.js';
 
 const FALLBACK_PALETTE = {
@@ -128,8 +128,15 @@ function drawHud(ctx: Ctx2D, view: Viewport, hud: HudModel, client: GameClient):
   // Top-left: survival. HP over XP, because HP is checked more often.
   panel(ctx, pad, pad, barW + 20, 62, { radius: 5 });
   label(ctx, hud.hpText, pad + 10, pad + 20, 14, THEME.text, 'left', 'bold');
-  bar(ctx, pad + 10, pad + 26, barW, 10, hud.hpFrac,
+  // A heart at the left and a dark tick every 10%: health never relies on hue alone.
+  drawHeart(ctx, pad + 17, pad + 31, 6.5, hud.hpFrac < 0.3 ? THEME.hpLow : THEME.hp);
+  const hpX = pad + 30, hpW = barW - 20;
+  bar(ctx, hpX, pad + 26, hpW, 10, hud.hpFrac,
     hud.hpFrac < 0.3 ? THEME.hpLow : THEME.hp, THEME.hpBack);
+  ctx.fillStyle = THEME.ink;
+  ctx.globalAlpha = 0.55;
+  for (let i = 1; i < 10; i++) ctx.fillRect(hpX + (hpW * i) / 10 - 0.75, pad + 26, i === 5 ? 2 : 1.5, i === 5 ? 10 : 5);
+  ctx.globalAlpha = 1;
   bar(ctx, pad + 10, pad + 42, barW, 7, hud.xpFrac, THEME.xp, THEME.xpBack);
   label(ctx, `LV ${hud.level}`, pad + 10 + barW, pad + 20, 13, THEME.xp, 'right', 'bold');
 
@@ -157,7 +164,7 @@ function drawHud(ctx: Ctx2D, view: Viewport, hud: HudModel, client: GameClient):
   if (hud.boss !== null) {
     const w = Math.min(460, view.width * 0.5);
     const x = view.width / 2 - w / 2;
-    const y = pad + 48;
+    const y = pad + 38 + 12 + 4; // 12 px under the clock panel
     panel(ctx, x - 8, y - 4, w + 16, 34, { radius: 4, fill: THEME.panelAlt });
     label(ctx, hud.boss.name.toUpperCase(), x, y + 9, 11, THEME.boss, 'left', 'bold');
     label(ctx, hud.boss.text, x + w, y + 9, 11, THEME.text, 'right');
@@ -181,6 +188,21 @@ function drawHud(ctx: Ctx2D, view: Viewport, hud: HudModel, client: GameClient):
     );
     if (d < 4) drawMerchantPrompt(ctx, view, merchant.stock, client.state.player.gold);
   }
+}
+
+function drawHeart(ctx: Ctx2D, cx: number, cy: number, r: number, fill: string): void {
+  ctx.beginPath();
+  ctx.moveTo(cx, cy + r);
+  ctx.quadraticCurveTo(cx - r * 1.5, cy - r * 0.1, cx - r * 0.75, cy - r * 0.75);
+  ctx.quadraticCurveTo(cx - r * 0.1, cy - r * 1.1, cx, cy - r * 0.45);
+  ctx.quadraticCurveTo(cx + r * 0.1, cy - r * 1.1, cx + r * 0.75, cy - r * 0.75);
+  ctx.quadraticCurveTo(cx + r * 1.5, cy - r * 0.1, cx, cy + r);
+  ctx.closePath();
+  ctx.fillStyle = fill;
+  ctx.fill();
+  ctx.strokeStyle = THEME.ink;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
 }
 
 function drawLoadout(ctx: Ctx2D, view: Viewport, hud: HudModel): void {
@@ -332,7 +354,7 @@ function drawCard(
   ctx.fill();
 
   label(ctx, option.name, x + w / 2, y + h * 0.48, Math.max(13, w * 0.066), THEME.text, 'center', 'bold');
-  const kindText = option.kind === 'gold' ? `+${option.goldAmount ?? 0} GOLD` : option.kind.toUpperCase();
+  const kindText = option.kind === 'gold' ? `+${option.goldAmount ?? 0} GOLD` : cardKindLabel(option.kind);
   kicker(ctx, kindText, x + w / 2, y + h * 0.56, Math.max(9, w * 0.042), THEME.textDim, 'center');
   paragraph(ctx, option.description, x + w / 2, y + h * 0.66, w - 26,
     Math.max(11, w * 0.05), THEME.textDim, 4, 'center');
@@ -435,10 +457,10 @@ function drawHub(ctx: Ctx2D, client: GameClient): void {
   const y = Math.max(10, view.height / 2 - h / 2);
 
   panel(ctx, x, y, w, h, { radius: 10 });
-  kicker(ctx, 'MEGABONK', x + 24, y + L.titleY, 26, THEME.accent);
+  kicker(ctx, 'HOLLOWLIGHT', x + 24, y + L.titleY, 26, THEME.accent);
   label(ctx, 'Verdant Hollow · 15 minutes · one life', x + 24, y + L.subtitleY, 13, THEME.textDim);
 
-  label(ctx, `${formatCount(client.profile.silver)} silver`, x + w - 24, y + L.silverY, 18,
+  label(ctx, `${formatCount(client.profile.silver)} motes`, x + w - 24, y + L.silverY, 18,
     THEME.silver, 'right', 'bold');
   // Its own line, right-aligned under the silver. It used to share a baseline
   // with the subtitle, and the two ran into each other.
@@ -466,7 +488,7 @@ function drawHub(ctx: Ctx2D, client: GameClient): void {
     label(ctx, entry.label, x + 44, rowY + 22, 15, THEME.text, 'left', 'bold');
     label(ctx, entry.detail, x + 44, rowY + 40, 12, THEME.textDim, 'left');
     if (entry.kind === 'unlock') {
-      const right = entry.owned ? 'OWNED' : `${unlockDef?.cost ?? entry.cost} silver`;
+      const right = entry.owned ? 'OWNED' : `${unlockDef?.cost ?? entry.cost} motes`;
       label(ctx, right, x + w - 30, rowY + 30, 13,
         entry.owned ? THEME.accent : entry.affordable ? THEME.silver : THEME.textDim, 'right', 'bold');
     } else {
@@ -527,8 +549,8 @@ function drawSummary(ctx: Ctx2D, client: GameClient): void {
 
   const silverY = y + L.silverY;
   panel(ctx, x + 24, silverY - 22, w - 48, 34, { radius: 5, fill: THEME.panelAlt, edge: THEME.silver });
-  label(ctx, 'Silver earned', x + 36, silverY, 13, THEME.textDim, 'left');
-  label(ctx, `+${formatCount(summary.silverEarned)} silver`, x + w - 36, silverY, 15,
+  label(ctx, 'Motes earned', x + 36, silverY, 13, THEME.textDim, 'left');
+  label(ctx, `+${formatCount(summary.silverEarned)} motes`, x + w - 36, silverY, 15,
     THEME.silver, 'right', 'bold');
 
   if (L.showQuestHeader) kicker(ctx, 'QUEST PROGRESS', x + 24, y + L.questHeaderY, 10, THEME.textDim);

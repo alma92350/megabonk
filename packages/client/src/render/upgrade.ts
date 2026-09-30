@@ -45,6 +45,15 @@ export function layoutCards(count: number, view: Viewport): CardLayout[] {
   return cards;
 }
 
+/**
+ * The word a player reads for an offer's kind. The sim's internal id for a
+ * passive is 'tome'; the game calls it a Rite. Only this label changes: the id
+ * stays, because renaming it would invalidate recordings and golden runs.
+ */
+export function cardKindLabel(kind: string): string {
+  return kind === 'tome' ? 'RITE' : kind.toUpperCase();
+}
+
 /** FR-19: the reroll affordance appears only when a reroll is actually available. */
 export function shouldShowReroll(rerolls: number): boolean {
   return Number.isFinite(rerolls) && rerolls > 0;

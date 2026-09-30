@@ -13,7 +13,7 @@ import type { WeaponDef } from '@megabonk/sim';
  */
 export const weapons: Record<string, WeaponDef> = {
   bonker: {
-    id: 'bonker', name: 'The Bonker', kind: 'melee', maxLevel: 5,
+    id: 'bonker', name: 'Rootclub', kind: 'melee', maxLevel: 5,
     description: 'A wide, heavy swing. Three targets now, seven when mastered.',
     // range 3.0 against a 0.9-unit contact distance. Wide enough that a moving
     // player is not swarmed from behind (at 2.4 the reference kiting policy died
@@ -36,7 +36,7 @@ export const weapons: Record<string, WeaponDef> = {
     damagePerLevel: 14, cooldownReductionPerLevel: 4, targetsPerLevel: 0,
   },
   halo: {
-    id: 'halo', name: 'Halo', kind: 'orbital', maxLevel: 5,
+    id: 'halo', name: 'Wisp Ring', kind: 'orbital', maxLevel: 5,
     description: 'Orbiting shards. Low per-hit, relentless, and scales with Area.',
     // The fastest cadence in the roster, which makes it the weapon that cares
     // most about attack speed and area — and the one that carries a swarm run.

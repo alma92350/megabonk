@@ -7,12 +7,12 @@ const port = portArg ? Number(portArg.slice(7)) : DEFAULT_BRIDGE_PORT;
 
 startBridge({ port })
   .then((h) => {
-    console.error(`[megabonk] bridge listening on http://127.0.0.1:${h.port} (loopback only)`);
+    console.error(`[hollowlight] bridge listening on http://127.0.0.1:${h.port} (loopback only)`);
     const stop = (): void => void h.close().then(() => process.exit(0));
     process.on('SIGINT', stop);
     process.on('SIGTERM', stop);
   })
   .catch((err: unknown) => {
-    console.error('[megabonk] bridge failed:', err instanceof Error ? err.message : err);
+    console.error('[hollowlight] bridge failed:', err instanceof Error ? err.message : err);
     process.exit(1);
   });

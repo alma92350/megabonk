@@ -9,7 +9,7 @@
 
 import type { Recording } from '@megabonk/sim';
 
-export const RECORDINGS_KEY = 'megabonk.recordings.v1';
+export const RECORDINGS_KEY = 'hollowlight.recordings.v1';
 export const MAX_STORED = 10;
 
 export interface StoredRecording {

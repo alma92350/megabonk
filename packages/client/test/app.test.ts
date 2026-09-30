@@ -87,7 +87,7 @@ describe('client lifecycle', () => {
     c.hubIndex = 0;
     press(c, 'Enter');
     expect(c.profile.purchased).toEqual([]);
-    expect(c.notice).toMatch(/silver/i);
+    expect(c.notice).toMatch(/motes/i);
   });
 
   it('purchases an unlock and persists it', () => {

@@ -62,10 +62,10 @@ export function buildServer(argv: readonly string[]): {
     handicap: options.handicap,
   });
   const server = new McpServer(
-    { name: 'megabonk', version: '0.1.0' },
+    { name: 'hollowlight', version: '0.1.0' },
     {
       instructions:
-        `Megabonk run control. Handicap profile: ${options.handicap.profile}. ` +
+        `Hollowlight run control. Handicap profile: ${options.handicap.profile}. ` +
         'Observations are delayed and filtered (FR-27); actions are delayed and rate-limited (FR-28). ' +
         'Movement intents persist until replaced, so the run never waits for you.',
     },

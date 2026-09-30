@@ -74,7 +74,7 @@ const SPECS: ToolSpec[] = [
   },
   {
     name: 'get_build',
-    description: 'Current weapons, tomes, items and active buffs with levels and resolved stats.',
+    description: 'Current weapons, rites, items and active buffs with levels and resolved stats.',
     write: false,
     inputSchema: {},
     handler: (s) => s.getBuild(),

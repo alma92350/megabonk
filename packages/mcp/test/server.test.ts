@@ -15,7 +15,7 @@ async function connect(argv: string[]) {
 describe('FR-22 MCP lifecycle over a real transport', () => {
   it('AC-22.1: completes the initialise handshake and lists its tools', async () => {
     const { client, close } = await connect(['--headless']);
-    expect(client.getServerVersion()?.name).toBe('megabonk');
+    expect(client.getServerVersion()?.name).toBe('hollowlight');
     const listed = (await client.listTools()).tools;
     const names = listed.map((t) => t.name).sort();
     for (const r of READ_TOOLS) expect(names).toContain(r);

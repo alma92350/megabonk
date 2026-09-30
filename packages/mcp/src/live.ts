@@ -186,7 +186,7 @@ export class LiveAgent {
       // wrong-arity call to resolveIntentVector once. Surface those.
       this.lastError = err instanceof Error ? err : new Error(String(err));
       if (!isBridgeUnreachable(this.lastError)) {
-        console.error('[megabonk] live agent error:', this.lastError.message);
+        console.error('[hollowlight] live agent error:', this.lastError.message);
       }
     }
   }

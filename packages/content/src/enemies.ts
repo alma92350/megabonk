@@ -70,11 +70,11 @@ export const enemies: Record<string, EnemyDef> = {
     ranged: { range: 13, cooldownTicks: 190, projectileSpeed: 24, standoff: 7 },
   },
   // The DPS check. If you cannot kill a Hulk you cannot hold a position.
-  tank: { id: 'tank', name: 'Hulk', hp: 150, damage: 11, speed: 1.35, radius: 1.0, xp: 16, gold: 9 },
+  tank: { id: 'tank', name: 'Cairnwight', hp: 150, damage: 11, speed: 1.35, radius: 1.0, xp: 16, gold: 9 },
   // Boss. Damage 20 at t=900 resolves to ~41 per hit after damageScale: touching
   // it is never survivable for long, at any build.
   warden: {
-    id: 'warden', name: 'The Warden', hp: 1100, damage: 20, speed: 1.7, radius: 1.7,
+    id: 'warden', name: 'The Old Crown', hp: 1100, damage: 20, speed: 1.7, radius: 1.7,
     xp: 120, gold: 80, isBoss: true,
   },
 };

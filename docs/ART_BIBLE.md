@@ -1,10 +1,10 @@
-# Art Bible — Kindlewild (working title; see ORIGINALITY.md)
+# Art Bible — Hollowlight (see ORIGINALITY.md)
 
 This is an original setting. It borrows no names, characters, places or lore from any existing game, film or book. Everything here is a proposal for the team to adopt or amend; where shipped content disagrees, see Reconciliation at the end.
 
 ## 1. World and premise
 
-**The Kindlewild** is a forest-country whose every living thing once drew warmth and growth from one lantern-tree, the **Heartroot**. Its keeper, the antlered **Old Crown** (currently shipped as "The Warden"), was sworn to keep the Heartroot lit. When the light guttered, the Crown did not die; it hardened, and now guards the dark, striking down anything that carries a flame. The wildlife and the forest's small folk, starved of light, have turned feral and drift toward any glow. You are a **Kindler**: a lamp-bearing scavenger who walks in carrying a scrap of the old fire, and must survive fifteen minutes among things that want it, to reach the Heartroot's stump and relight it.
+**The Hollow** is a forest-country whose every living thing once drew warmth and growth from one lantern-tree, the **Heartroot**. Its keeper, the antlered **Old Crown** (currently shipped as "The Warden"), was sworn to keep the Heartroot lit. When the light guttered, the Crown did not die; it hardened, and now guards the dark, striking down anything that carries a flame. The wildlife and the forest's small folk, starved of light, have turned feral and drift toward any glow. You are a **Kindler**: a lamp-bearing scavenger who walks in carrying a scrap of the old fire, and must survive fifteen minutes among things that want it, to reach the Heartroot's stump and relight it.
 
 ## 2. Tone and themes
 
@@ -121,7 +121,7 @@ New content must: (1) fit an existing ecology role or add one explicitly; (2) ta
 
 | Shipped now | Conflict with bible | Recommended change |
 |---|---|---|
-| Game title "MEGABONK" (`renderer.ts` `kicker`, `index.html`) | Not in the naming grammar ("mega", "bonk"), identical to an existing commercial game | Retitle (ORIGINALITY.md recommends "Kindlewild") |
+| Game title "MEGABONK" (`renderer.ts` `kicker`, `index.html`) | Not in the naming grammar ("mega", "bonk"), identical to an existing commercial game | Retitled to "Hollowlight" (owner's choice) |
 | "The Bonker" weapon, "Bonker" hero (`weapons.ts`, `characters.ts`) | Borrowed-feeling slang; not folk-tool grammar | Rootclub / the Kindler |
 | "Silver" meta currency | Common but adjacent to a rival's currency | "Motes" |
 | "Tome of X" passive class | Borrowed genre term; conflicts with heraldic sigil UI | "Rite of X" |

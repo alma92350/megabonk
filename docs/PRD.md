@@ -1,9 +1,11 @@
-# PRD: Megabonk (local TDD build)
+# PRD: Hollowlight (local TDD build)
 
 **Status:** Draft v2 — supersedes the market-research PRD
 **Scope:** A locally-run, test-driven 2.5D roguelike survival game with an MCP server that lets an AI agent advise or play alongside a human.
 
-> **Note on origin.** This project is *mechanically inspired by* the "bullet heaven" genre (Vampire Survivors, Risk of Rain 2, Megabonk). It is not a reproduction of any commercial title, ships no third-party assets, and uses no third-party names in shipped content. `megabonk` is the working repository name only.
+> **Note on origin.** This project is *mechanically inspired by* the "bullet heaven" genre. It is not a reproduction of any commercial title, ships no third-party assets, and uses no third-party names in shipped content. `megabonk` is the working repository name only.
+>
+> **Naming update (post-audit).** An independent audit (`docs/ORIGINALITY.md`) found that the working title and a few terms this PRD borrowed echoed an existing commercial game. The shipped game is titled **Hollowlight**. In player-facing text the meta currency "Silver" is now **Motes**, the passive class "Tomes" is now **Rites**, and several display names changed (see the audit's rename table). Requirement IDs, code identifiers (`silver`, `tome`, content ids) and the acceptance criteria below are unchanged, so the text below keeps the original words where they name an identifier.
 
 ---
 

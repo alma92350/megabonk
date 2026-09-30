@@ -9,7 +9,7 @@ import type { CharacterDef } from '@megabonk/sim';
  */
 export const characters: Record<string, CharacterDef> = {
   bonker: {
-    id: 'bonker', name: 'Bonker',
+    id: 'bonker', name: 'The Kindler',
     description: 'Balanced. 145 HP, a big stick, and no excuses.',
     // The reference character every balance target in DESIGN.md is measured on.
     // +20 HP (not a multiplier) because the forgiveness is wanted in minute one,
@@ -35,7 +35,7 @@ export const characters: Record<string, CharacterDef> = {
   },
 
   bastion: {
-    id: 'bastion', name: 'Bastion',
+    id: 'bastion', name: 'Barkguard',
     description: 'Tank. 208 HP and 3 armour, but slow and hits soft.',
     // (100 + 30) * 1.6 = 208 HP, and 3 flat armour halves an early Grunt hit.
     // Pays 18% move speed and 15% might: Bastion CAN stand in a swarm, and its

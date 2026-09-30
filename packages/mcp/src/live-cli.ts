@@ -49,10 +49,10 @@ async function main(): Promise<void> {
   let owned: Awaited<ReturnType<typeof startBridge>> | null = null;
   try {
     await api.health();
-    console.error(`[megabonk] using the bridge already running on :${args.port}`);
+    console.error(`[hollowlight] using the bridge already running on :${args.port}`);
   } catch {
     owned = await startBridge({ port: args.port });
-    console.error(`[megabonk] started a bridge on :${owned.port}`);
+    console.error(`[hollowlight] started a bridge on :${owned.port}`);
   }
 
   const agent = new LiveAgent(api, {
@@ -61,10 +61,10 @@ async function main(): Promise<void> {
   });
 
   console.error(
-    `[megabonk] ${args.mode} agent attached at ${args.hz} Hz.\n` +
-      `[megabonk] open the game, start a run, and it will ${
+    `[hollowlight] ${args.mode} agent attached at ${args.hz} Hz.\n` +
+      `[hollowlight] open the game, start a run, and it will ${
         args.mode === 'advisor' ? 'advise you on screen' : 'take the controls'
-      }.\n[megabonk] Ctrl-C to detach.`,
+      }.\n[hollowlight] Ctrl-C to detach.`,
   );
 
   let announced = false;
@@ -74,7 +74,7 @@ async function main(): Promise<void> {
         const status = await agent.status();
         if (status.clientConnected) {
           announced = true;
-          console.error('[megabonk] game detected — agent is live.');
+          console.error('[hollowlight] game detected — agent is live.');
         }
       }
       await agent.act();
@@ -96,7 +96,7 @@ async function main(): Promise<void> {
 const isMain = process.argv[1]?.includes('live-cli');
 if (isMain) {
   main().catch((err: unknown) => {
-    console.error('[megabonk] live agent failed:', err instanceof Error ? err.message : err);
+    console.error('[hollowlight] live agent failed:', err instanceof Error ? err.message : err);
     process.exit(1);
   });
 }

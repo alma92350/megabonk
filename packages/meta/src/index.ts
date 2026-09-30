@@ -94,7 +94,7 @@ export function purchase(profile: Profile, unlockId: string): PurchaseResult {
     return { profile, ok: false, reason: 'already purchased' };
   }
   if (profile.silver < def.cost) {
-    return { profile, ok: false, reason: `needs ${def.cost} silver, have ${profile.silver}` };
+    return { profile, ok: false, reason: `needs ${def.cost} motes, have ${profile.silver}` };
   }
   return {
     ok: true,

@@ -51,7 +51,7 @@ Risk scale: none / low / medium / high. "Unverified" means I believe it may coll
 
 | Current term | Where used | Risk | Reasoning | Recommended original replacement |
 |---|---|---|---|---|
-| **MEGABONK** (title) | `renderer.ts` line 438 hub `kicker`; `index.html` `<title>`, `aria-label`, `<noscript>`; README heading; localStorage keys `megabonk.*`; window globals; repo name | **HIGH** | "Megabonk" is the name of an existing commercial game in this exact genre (3D bullet-heaven/roguelike, released 2025). Same name, same genre, same platform class = the textbook likelihood-of-confusion scenario. The PRD says the name is "working only", but it is player-facing on the hub and in the tab title. | **Kindlewild** (see section 4) |
+| **MEGABONK** (title) | `renderer.ts` line 438 hub `kicker`; `index.html` `<title>`, `aria-label`, `<noscript>`; README heading; localStorage keys `megabonk.*`; window globals; repo name | **HIGH** | "Megabonk" is the name of an existing commercial game in this exact genre (3D bullet-heaven/roguelike, released 2025). Same name, same genre, same platform class = the textbook likelihood-of-confusion scenario. The PRD says the name is "working only", but it is player-facing on the hub and in the tab title. | **Hollowlight** (owner's choice; see section 4) |
 | "Bonker" (starting weapon "The Bonker", hero "Bonker") | `weapons.ts` id `bonker`; `characters.ts`; comments | **MEDIUM** | Derives from "bonk"; sits on top of the title problem and reads as a nod to the same product. Generic on its own, but a player-facing weapon named the same as the rival's title word is avoidable. | Weapon **Rootclub**; hero **the Kindler** |
 | "Tome(s)" / "Tome of Fury..." (passive class) | `tomes.ts` (5 names), `hud.ts`, level-up cards (`ITEM`/`TOME` label) | **MEDIUM (unverified)** | To my knowledge, the closest comparable game uses "Tomes" for its stat-passive class; "tome" is an ordinary English word, but as a *class name for the passive-stat item type* it is a distinctive systemic borrowing. | **Rites** (Rite of Fury, Rite of Wrath, Rite of the Edge, Rite of Hide, Rite of Fortune) |
 | "Silver" (meta currency) | `meta/src/index.ts` (`profile.silver`, unlock costs, error strings), `renderer.ts` lines 441, 469, 530; UI text "0 silver", "Silver earned" | **MEDIUM (unverified)** | To my knowledge the same comparable game uses silver as its persistent currency. "Silver" is generic, but pairing with "gold" as in-run currency and "Tomes" as a class stacks up as a pattern. Also a currency called *silver* alongside *gold* is very common, so alone it is low. | **Motes** ("+71 motes", "Motes earned") |
@@ -86,7 +86,7 @@ gold, gem, chest, shrine, merchant, goblin, fox, beetle, wolf, imp, seer, golem,
 4. **Wickwood Wake**.
 5. **Lanternmoor**.
 
-**Recommendation: Kindlewild.** It is short, easy to say, describes the premise (a small light carried into a feral forest), carries a strong visual motif (lamp glow) for logo and marketing, and I do not know of any game with that exact name. **Unverified:** I could not search for it. "Hollowlight" is a strong second, but "Hollow" is heavily used in game titles and would be crowded.
+**Auditor's recommendation: Kindlewild. Owner's decision: Hollowlight.** It is short, easy to say, describes the premise (a small light carried into a feral forest), carries a strong visual motif (lamp glow) for logo and marketing, and I do not know of any game with that exact name. **Unverified:** I could not search for it. "Hollowlight" is a strong second, but "Hollow" is heavily used in game titles and would be crowded.
 
 **What the owner should do (I cannot do this for you):** search the trademark registers (USPTO TESS/Trademark Search, EUIPO eSearch plus, WIPO Global Brand Database) in classes 9, 41 and 28 for the title and near variants; search Steam, itch.io, the Apple App Store and Google Play, plus general web search and domain/social handles; then have a trademark attorney confirm before spending on branding. Do the same for the renamed weapon, currency and boss if they will appear in marketing.
 
@@ -125,3 +125,25 @@ One-line recommendation (your decision): option 2 if you want a community, optio
 > [Add before publishing: the final game title, the licence chosen, and the result of your trademark search.]
 
 This statement is accurate to what I verified as of this review. It becomes inaccurate if you bundle fonts or add art/audio; update it then. I did not verify git history, transitive dependency licences, or that the authors did not consciously trace any reference.
+
+
+## 8. Decisions taken and changes applied
+
+**Title: Hollowlight (the owner's choice).** The auditor preferred Kindlewild. Hollowlight was their stated runner-up, with one caveat that still stands: *"Hollow" is heavily used in game titles and would be crowded.* That makes the trademark and storefront search in section 4 MORE important for this title, not less. Nothing here has been legally cleared.
+
+**Applied in the code, with a guard test** (`packages/content/test/originality.test.ts`, which fails the build if a banned term reaches player-facing text):
+
+| Was | Now |
+|---|---|
+| MEGABONK (title, tab title, aria label, storage keys, MCP server name, CLI log prefix) | Hollowlight |
+| Silver (meta currency, UI text) | Motes |
+| Tome(s) (passive class, card label) | Rite(s) |
+| The Bonker (weapon) / Bonker (hero) | Rootclub / The Kindler |
+| Halo (orbital weapon) | Wisp Ring |
+| Bastion (hero) | Barkguard |
+| Hulk (tank enemy) | Cairnwight |
+| The Warden (boss) | The Old Crown |
+
+**Deliberately unchanged:** internal identifiers (content ids such as `bonker` and `warden`, the `silver` and `tome` field and kind names, sprite-cache keys, the bridge protocol role string, the `window.__megabonk` developer global, and the `@megabonk/*` workspace package names). Players never see them, and renaming them would invalidate saved recordings, golden runs and tests without reducing any risk. The repository name `megabonk` is the owner's and is also unchanged. The auditor's optional flavour renames (Grunt, Runner, Brute and so on) were not requested and are not applied.
+
+**Existing saves:** the browser storage keys changed with the title, so a profile or recordings saved by an earlier build will not carry over. No player had a saved profile at the time of the change.

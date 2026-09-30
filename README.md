@@ -1,4 +1,4 @@
-# Megabonk
+# Hollowlight
 
 A 2.5D roguelike survival game — "bullet heaven": your character auto-attacks, you
 control movement, positioning and build decisions against escalating waves.
@@ -35,7 +35,7 @@ npm run bench                 # performance budgets
 packages/
   sim/        the deterministic simulation — pure, headless, no renderer
   content/    all balance numbers as data, plus a schema validator
-  meta/       silver, unlocks, quests, save-file handling
+  meta/       motes (the meta currency), unlocks, quests, save-file handling
   client/     canvas renderer, HUD, screens, input
   mcp/        MCP server and the agent perception/actuation handicap
   bridge/     the loopback co-play bridge between the page and an agent

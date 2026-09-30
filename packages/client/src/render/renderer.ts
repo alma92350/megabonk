@@ -64,6 +64,7 @@ export function drawFrame(ctx: Ctx2D, client: GameClient, nowMs = frameClock + 1
     content,
     time: nowMs,
     reduceMotion: client.reduceMotion,
+    fx: client.combatFx,
   };
 
   // Screen shake is a camera-space translate, never a change to sim state.

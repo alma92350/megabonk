@@ -43,6 +43,7 @@ import { buildHud, type HudModel } from './hud.js';
 import { detectStorage, loadProfile, saveProfile, type StoragePort } from './storage.js';
 import { saveRecording } from './recordings.js';
 import type { Viewport } from './render/projection.js';
+import { FxManager } from './render/fx/index.js';
 
 export type Screen = 'hub' | 'run' | 'summary';
 
@@ -117,6 +118,8 @@ export class GameClient {
   readonly fx: Fx = { shake: 0, damageFlash: 0, levelFlash: 0, killFlash: 0, bossFlash: 0 };
   readonly keys = new KeyTracker();
   readonly reduceMotion: boolean;
+  /** Display-only combat effects; derived from state pairs, never read by the sim. */
+  readonly combatFx: FxManager;
 
   private readonly storage: StoragePort | null;
   private readonly seedSource: () => number;
@@ -157,6 +160,7 @@ export class GameClient {
   constructor(options: GameClientOptions = {}) {
     this.view = options.viewport ?? DEFAULT_VIEW;
     this.reduceMotion = options.reduceMotion ?? false;
+    this.combatFx = new FxManager({ reduceMotion: this.reduceMotion });
     this.seedSource = options.seedSource ?? randomSeed;
     this.storage = options.storage === undefined ? detectStorage() : options.storage;
 
@@ -180,6 +184,7 @@ export class GameClient {
     const state = createRun(this.config);
     this.state = state;
     this.prev = state;
+    this.combatFx.clear();
     this.events = [...state.events];
     this.acc = 0;
     this.alpha = 0;
@@ -463,6 +468,7 @@ export class GameClient {
   /** Derive display feedback from the tick that just ran. Never writes to state. */
   private observe(before: GameState, after: GameState): void {
     for (const e of after.events) this.events.push(e);
+    this.combatFx.observe(before, after, content.weapons, content.enemies);
 
     if (after.player.hp < before.player.hp) {
       this.flash('damageFlash', 0.85);

@@ -51,12 +51,13 @@ function start(): void {
   const client = new GameClient({ reduceMotion: prefersReducedMotion() });
   installAdviceBridge(window as unknown as Record<string, unknown>);
 
-  // Co-play. The bridge is entirely optional: if nothing is listening on the
-  // port, every poll fails quietly and the game is exactly the game it was.
-  // `?bridge=<port>` overrides, `?bridge=off` disables it outright.
+  // Co-play is opt-in: polling a port with nothing listening floods the browser
+  // console with connection errors, so the page only talks to the bridge when
+  // asked. `?bridge` uses the default port, `?bridge=<port>` picks one.
   const bridgeParam = new URLSearchParams(window.location.search).get('bridge');
-  if (bridgeParam !== 'off') {
-    const port = Number(bridgeParam ?? DEFAULT_BRIDGE_PORT) || DEFAULT_BRIDGE_PORT;
+  if (bridgeParam !== null && bridgeParam !== 'off') {
+    const asPort = Number(bridgeParam);
+    const port = asPort >= 1024 && asPort <= 65535 ? asPort : DEFAULT_BRIDGE_PORT;
     const coplay = new CoPlay(bridgeApi(`http://127.0.0.1:${port}`), {
       getState: () => (client.screen === 'run' ? client.state : null),
       applyIntent: (intent) => {

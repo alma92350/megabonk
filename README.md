@@ -83,16 +83,16 @@ The agent and the game are separate processes that meet over a tiny loopback
 bridge, so you can hand over as much or as little as you like:
 
 ```bash
-npm start                              # terminal 1: the game
+npm start                              # terminal 1: the game, then open http://localhost:5173/?bridge
 npm run agent:live                     # terminal 2: an advisor
 npm run agent:live -- --autonomous     # ...or let it play
 ```
 
 Advisor mode posts a recommendation to a panel on your screen and never touches
 the controls. Autonomous mode drives, but your keys always win: press a movement
-key and you have it back that frame. The bridge is entirely optional — with
-nothing listening, every poll fails quietly and the game is exactly the game it
-was, which is asserted rather than assumed.
+key and you have it back that frame. The bridge is opt-in: the page only
+talks to it when opened with `?bridge` (or `?bridge=<port>`), so a normal
+session makes no network calls and logs no connection errors.
 
 The page publishes its state RAW and the handicap is applied on the way out to
 the agent, in `packages/mcp`. That is deliberate: filtering at the source would

@@ -506,7 +506,7 @@ export class FxManager {
         continue;
       }
       // crescent: the leading edge sweeps across the arc, the tail follows it
-      const span = 1.15;
+      const span = 1.35;
       const lead = Math.min(1, t / 0.45);
       const tail = Math.max(0, (t - 0.2) / 0.8);
       const mid = this.shAng[i]!;
@@ -516,7 +516,7 @@ export class FxManager {
       const r = this.shR[i]! * zoom;
       const ry = r * Y_SQUASH;
       const am = (a0 + a1) / 2;
-      const inner = 0.5 + 0.2 * (1 - (a1 - a0) / (2 * span));
+      const inner = 0.22 + 0.2 * (1 - (a1 - a0) / (2 * span));
       ctx.globalAlpha = (1 - t) * 0.85;
       ctx.fillStyle = col;
       ctx.beginPath();
@@ -530,7 +530,7 @@ export class FxManager {
       ctx.fill();
       ctx.globalAlpha = (1 - t) * 0.95;
       ctx.strokeStyle = hi;
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = 3.5;
       ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.ellipse(cx, cy, r, ry, 0, a0, a1, false);

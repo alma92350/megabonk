@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /**
  * The browser entry must never reach a node builtin.
@@ -10,7 +11,7 @@ import { resolve, dirname } from 'node:path';
  * game page died at load with "node:http has been externalized" — a total
  * failure, not a degradation. Unit tests all passed, because they run in Node.
  */
-const SRC = resolve(dirname(new URL(import.meta.url).pathname), '../src');
+const SRC = resolve(dirname(fileURLToPath(import.meta.url)), '../src');
 
 function importsOf(file: string): string[] {
   const text = readFileSync(resolve(SRC, file), 'utf8');

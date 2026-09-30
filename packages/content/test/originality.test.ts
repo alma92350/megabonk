@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { content } from '../src/index.js';
 import { UNLOCKS, QUESTS } from '@megabonk/meta';
 
@@ -35,7 +36,7 @@ function violations(text: string): string[] {
   return BANNED.filter(([re]) => re.test(text)).map(([, why]) => why);
 }
 
-const HERE = dirname(new URL(import.meta.url).pathname);
+const HERE = dirname(fileURLToPath(import.meta.url));
 const PKGS = resolve(HERE, '../..');
 
 function walk(dir: string): string[] {

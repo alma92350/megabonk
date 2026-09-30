@@ -54,6 +54,7 @@ export interface Ctx2D {
   setLineDash(segments: number[]): void;
 
   fillText(text: string, x: number, y: number, maxWidth?: number): void;
+  strokeText(text: string, x: number, y: number, maxWidth?: number): void;
   measureText(text: string): { width: number };
 
   /** Blit a pre-rendered sprite. `image` is an OffscreenCanvas / canvas in the browser. */
